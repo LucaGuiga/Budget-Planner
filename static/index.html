@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Term Budget</title>
+<style>
+:root {
+  --bg: #f6f5f2; --surface: #ffffff; --surface-2: #f0efeb; --border: #dedbd4;
+  --text: #1d1c1a; --muted: #6b6862; --accent: #2f6f5e; --accent-text: #ffffff;
+  --accent-soft: #e2efe9; --danger: #b3261e; --danger-soft: #fbe9e7;
+  --warn-soft: #fff4dc; --bar: #2f6f5e; --bar-over: #b3261e;
+  --tuition: #c98a1b; --tuition-soft: #fbf0d9; --line: #c9c5bc;
+  --shadow: 0 1px 2px rgba(0,0,0,.05), 0 2px 8px rgba(0,0,0,.04);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #161716; --surface: #1f2120; --surface-2: #282a29; --border: #363937;
+    --text: #ecebe7; --muted: #a09d96; --accent: #6cc0a5; --accent-text: #0f1a16;
+    --accent-soft: #1f3530; --danger: #f2867c; --danger-soft: #3a1f1d;
+    --warn-soft: #3a3020; --bar: #6cc0a5; --bar-over: #f2867c;
+    --tuition: #e2b45a; --tuition-soft: #3a3020; --line: #4a4e4b;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html { color-scheme: light dark; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 15px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+.wrap { max-width: 1120px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 22px; margin: 0; }
+h2 { font-size: 17px; margin: 0 0 12px; }
+.muted { color: var(--muted); }
+.num { font-variant-numeric: tabular-nums; }
+button, input { font: inherit; color: inherit; }
+input[type=text], input[type=month], select {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 10px; width: 100%;
+}
+input:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+button {
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 7px 14px; cursor: pointer;
+}
+button:hover { filter: brightness(0.97); }
+button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+button.danger { background: var(--danger); color: #fff; border-color: var(--danger); }
+button.link { background: none; border: none; padding: 2px 4px; color: var(--accent); }
+button.ghost-danger { background: none; color: var(--danger); border-color: var(--danger); }
+.panel {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  padding: 18px; box-shadow: var(--shadow);
+}
+
+/* shared bits */
+.badge { display: inline-block; font-size: 12px; border-radius: 99px; padding: 1px 8px; font-weight: 600; }
+.badge.ok { background: var(--accent-soft); color: var(--accent); }
+.badge.bad { background: var(--danger-soft); color: var(--danger); }
+.badge.lock { background: var(--surface-2); color: var(--muted); }
+.stat { background: var(--surface); border: 1px solid var(--border); border-radius: 10px;
+  padding: 8px 14px; min-width: 150px; }
+.stat .k, .chip .k, .q-tuition .k { font-size: 12px; color: var(--muted); }
+.stat .v { font-size: 18px; font-weight: 600; }
+
+/* tree: term > quarters > months */
+.node { background: var(--surface); border: 1px solid var(--border); border-radius: 14px;
+  padding: 16px 18px; box-shadow: var(--shadow); display: grid; gap: 12px; }
+.node.term { border-width: 2px; border-color: var(--accent); }
+.node.quarter.over { border-color: var(--danger); }
+.node-head { display: flex; flex-wrap: wrap; gap: 14px; justify-content: space-between; align-items: center; }
+.node-head h2 { font-size: 19px; margin: 0; }
+.eyebrow { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--accent); font-weight: 700; }
+.node-stats { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.chip { background: var(--surface-2); border-radius: 10px; padding: 6px 12px; min-width: 110px; }
+.chip .v { font-size: 17px; font-weight: 600; }
+.chip.strong { background: var(--accent-soft); }
+.chip.strong .v { color: var(--accent); }
+.chip.tuition { background: var(--tuition-soft); }
+.chip.neg { background: var(--danger-soft); }
+.chip.neg .v { color: var(--danger); }
+.pay-list { margin-top: 4px; }
+.q-tuition { background: var(--tuition-soft); border-radius: 10px; padding: 8px 10px; display: grid;
+  grid-template-columns: auto; gap: 4px; align-content: start; }
+/* folding quarters */
+.q-fold { border: none; background: none; padding: 0 6px 0 0; font-size: 16px; color: var(--muted); cursor: pointer; vertical-align: 1px; }
+.q-fold:hover { color: var(--text); filter: none; }
+.q-folded { width: 100%; display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between;
+  text-align: left; cursor: pointer; padding: 12px 18px; font: inherit; color: var(--text); }
+.q-folded:hover { border-color: var(--accent); filter: none; }
+.q-fold-name { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 17px; }
+.q-fold-name .badge.now-q { margin-left: 0; vertical-align: 0; }
+.q-fold-stats { display: flex; gap: 18px; }
+.chev { color: var(--muted); }
+.branch.folded { padding-top: 12px; }
+.branch.folded::after { top: 36px; }
+.branch.folded:last-child::before { height: 38px; }
+
+/* quarter tile: tuition in the top right corner, everything else beside it */
+.q-head { display: grid; grid-template-columns: 1fr auto; gap: 16px; align-items: start; }
+.q-info { display: grid; gap: 2px; min-width: 0; }
+.q-info h2 { font-size: 19px; margin: 0; }
+.q-info .q-left { margin-top: 6px; }
+.q-stats { margin-top: 8px; }
+@media (max-width: 600px) { .q-head { grid-template-columns: 1fr; } }
+.q-tuition .money-input { width: 140px; }
+.q-tuition input[type=date] { background: var(--surface); border: 1px solid var(--border);
+  border-radius: 6px; padding: 2px 6px; font-size: 13px; }
+.q-tuition.none { min-width: 110px; }
+.split { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--surface-2); }
+.split .t { background: var(--tuition); }
+.split .s { background: var(--bar); }
+.legend { display: flex; gap: 16px; margin-top: -4px; }
+.sw { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.sw.t { background: var(--tuition); } .sw.s { background: var(--bar); }
+.notice { background: var(--tuition-soft); border-radius: 10px; padding: 10px 12px; }
+
+.tree { margin-left: 22px; }
+.branch { position: relative; padding: 18px 0 0 28px; }
+/* vertical trunk from the parent, and a horizontal elbow into this node */
+.branch::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; border-left: 2px solid var(--line); }
+.branch:last-child::before { bottom: auto; height: 46px; }
+.branch::after { content: ""; position: absolute; left: 0; top: 44px; width: 28px; border-top: 2px solid var(--line); }
+.children { position: relative; margin: 0 0 0 22px; padding: 14px 0 0 28px; }
+.children::before { content: ""; position: absolute; left: 0; top: 0; height: 40px; width: 26px;
+  border-left: 2px solid var(--line); border-bottom: 2px solid var(--line); border-bottom-left-radius: 10px; }
+@media (max-width: 600px) {
+  .tree { margin-left: 8px; } .branch { padding-left: 16px; } .branch::after { width: 16px; }
+  .children { margin-left: 10px; padding-left: 16px; } .children::before { width: 14px; }
+}
+
+/* individual expenses */
+.q-items { border-top: 1px dashed var(--border); padding-top: 10px; }
+.q-items summary { cursor: pointer; display: flex; justify-content: space-between; gap: 12px; list-style: none; }
+.q-items summary::-webkit-details-marker { display: none; }
+.q-items summary::before { content: "▸"; color: var(--muted); margin-right: 6px; }
+.q-items[open] summary::before { content: "▾"; }
+.q-items summary > span:first-child { flex: 1; }
+.q-items table { margin-top: 8px; }
+.month-col { width: 150px; }
+.chip .sub { font-size: 11px; color: var(--muted); }
+.cats .row.extra span:first-child::after { content: " +"; color: var(--accent); font-weight: 700; }
+.cats .row.boosted span:last-child::after { content: " ↑"; color: var(--accent); }
+.rem + .fixable, .fixable { color: var(--accent); font-size: 12px; margin-top: -4px; }
+.boost-note { margin-top: 3px; text-align: right; }
+.notice.reopt { display: flex; gap: 12px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.cats .row.item span:first-child::before { content: "◆ "; color: var(--accent); font-size: 10px; }
+
+/* optimizer */
+dialog.wide { width: min(1100px, calc(100vw - 32px)); }
+.optimizer { padding-bottom: 4px; }
+.opt-cols { display: grid; grid-template-columns: 1fr 1.4fr; gap: 14px; }
+@media (max-width: 720px) { .opt-cols { grid-template-columns: 1fr; } }
+.opt-col { background: var(--surface-2); border-radius: 10px; padding: 12px 14px; display: grid; gap: 10px; align-content: start; }
+.opt-col h4 { margin: 0; font-size: 14px; }
+.static-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.static-list li { display: flex; justify-content: space-between; gap: 8px; }
+.slider-row { display: grid; gap: 4px; }
+.slider-top { display: flex; justify-content: space-between; gap: 8px; }
+.slider-row input[type=range] { width: 100%; accent-color: var(--accent); }
+.opt-table-wrap { overflow-x: auto; }
+.opt-table td, .opt-table th { white-space: nowrap; }
+.opt-table td.money, .opt-table th.money { width: auto; text-align: right; }
+.opt-table .q-row td { font-weight: 650; border-top: 1px solid var(--border); padding-top: 8px; }
+.opt-table td.indent { padding-left: 18px; color: var(--muted); }
+.opt-table tfoot td { font-weight: 700; border-top: 2px solid var(--border); }
+.neg-text { color: var(--danger); }
+.static-col { width: 1%; white-space: nowrap; }
+.static-col .toggle + .toggle { margin-left: 10px; }
+input:disabled { opacity: .55; cursor: not-allowed; }
+button:disabled { opacity: .5; cursor: not-allowed; }
+
+/* paid + quarter "left as of" */
+.views { display: inline-flex; gap: 8px; }
+.views button.on { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+.req-controls { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; }
+.req-controls input[type=date], .req-controls select { width: auto; min-width: 180px; }
+.req-controls input[type=date] { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; }
+.req-out { display: grid; gap: 12px; }
+.req-table td { padding: 6px 4px; border-bottom: 1px solid var(--border); }
+.req-table td.money { text-align: right; width: 140px; }
+.req-table td.indent { padding-left: 18px; }
+.req-table tr.total td { font-weight: 700; border-bottom: none; border-top: 2px solid var(--border); }
+.gaps { margin: 6px 0 0; padding-left: 18px; }
+.req-include { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.toggle.pill { background: var(--surface-2); border: 1px solid var(--border); border-radius: 99px; padding: 4px 10px; font-size: 14px; }
+.toggle.pill:has(input:not(:checked)) { opacity: .6; text-decoration: line-through; }
+.req-table tr.sub td { font-weight: 600; border-bottom: none; padding-bottom: 0; }
+.req-table tr.left-out td { color: var(--muted); }
+.req-table tr.left-out td.money { text-decoration: line-through; }
+.req-add { display: flex; flex-wrap: wrap; gap: 12px; align-items: end; background: var(--surface-2); border-radius: 10px; padding: 12px 14px; }
+.req-add select { min-width: 160px; }
+.paid-cols { grid-template-columns: 1.4fr 1fr; }
+@media (max-width: 720px) { .paid-cols { grid-template-columns: 1fr; } }
+.received-box { align-self: end; padding-bottom: 8px; }
+.paid-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: end; }
+.paid-grid input[type=date], .paid-table input[type=date], .q-left input[type=date], .people input {
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 8px; width: 100%; }
+.cov { background: var(--surface); border-radius: 8px; padding: 8px 10px; }
+.people { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.people li { display: flex; gap: 8px; align-items: center; }
+.people li input { flex: 1; }
+.paid-table { font-size: 13px; }
+.paid-table td, .paid-table th { white-space: nowrap; padding: 4px 4px; }
+.paid-table td.money { width: 110px; min-width: 110px; }
+.paid-table input[type=date] { width: auto; padding: 3px 4px; font-size: 13px; }
+.paid-table input[type=text] { padding: 4px 8px 4px 20px; }
+.paid-table select { min-width: 100px; padding: 4px 6px; }
+.paid-table .reimb { display: flex; gap: 6px; align-items: center; }
+.q-left { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.q-left input[type=date] { width: auto; padding: 3px 6px; font-size: 13px; margin-left: 4px; }
+
+/* where we are now */
+.node.quarter.now { border: 2px solid var(--q-color);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--q-color) 22%, transparent), 0 0 24px color-mix(in srgb, var(--q-color) 30%, transparent); }
+.badge.now-q { background: color-mix(in srgb, var(--q-color) 22%, transparent); color: var(--text);
+  border: 1px solid var(--q-color); vertical-align: 3px; margin-left: 6px; }
+.q-progress { position: relative; height: 8px; }
+.q-progress-track { position: absolute; inset: 2px 0; border-radius: 99px; opacity: .85;
+  background: linear-gradient(90deg, #22d3ee 0%, #facc15 16.7%, #3b82f6 33.3%, #22c55e 50%, #8b5a2b 66.7%, #dc143c 83.3%, #dc143c 100%); }
+.q-progress-mark { position: absolute; top: -3px; width: 4px; height: 14px; margin-left: -2px; border-radius: 2px;
+  background: var(--text); box-shadow: 0 0 0 2px var(--surface); }
+
+@property --sunset-angle { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+.card.current { position: relative; border-color: transparent; }
+.card.current::before {
+  content: ""; position: absolute; inset: -1px; border-radius: 12px; padding: 3px; pointer-events: none;
+  background: conic-gradient(from var(--sunset-angle), #ffd166, #ff9f1c, #ff6b6b, #f15bb5, #9b5de5, #ff6b6b, #ff9f1c, #ffd166);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: sunset-snake 6s linear infinite;
+}
+@keyframes sunset-snake { to { --sunset-angle: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .card.current::before { animation: none; } }
+.badge.now { background: linear-gradient(90deg, #ff9f1c, #f15bb5); color: #1d1c1a; }
+
+.restart-banner { background: var(--tuition-soft); border: 1px solid var(--tuition); border-radius: 10px;
+  padding: 10px 14px; margin-bottom: 16px; }
+
+/* term dialog */
+.term-group { display: grid; gap: 8px; }
+.term-group + .term-group { border-top: 1px solid var(--border); padding-top: 16px; }
+.term-group h3 { margin: 0; font-size: 15px; }
+.term-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.term-row .money-input { width: 180px; }
+.term-row p { flex-basis: 100%; margin: 0; }
+
+/* month cards */
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.card {
+  text-align: left; background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px; box-shadow: var(--shadow); cursor: pointer;
+  display: flex; flex-direction: column; gap: 8px;
+}
+.card:hover { border-color: var(--accent); filter: none; }
+.card.over { border-color: var(--danger); background: linear-gradient(var(--danger-soft), var(--surface) 60%); }
+.card .top { display: flex; justify-content: space-between; align-items: center; }
+.card .name { font-weight: 600; }
+.card .alloc { font-size: 22px; font-weight: 650; }
+.bar { height: 6px; background: var(--surface-2); border-radius: 99px; overflow: hidden; }
+.bar > div { height: 100%; background: var(--bar); }
+.card.over .bar > div { background: var(--bar-over); }
+.cats { font-size: 13px; color: var(--muted); display: grid; gap: 2px; }
+.cats .row { display: flex; justify-content: space-between; gap: 8px; }
+.cats .row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tuition-line { display: flex; justify-content: space-between; gap: 8px; font-size: 13px;
+  background: var(--tuition-soft); border-radius: 6px; padding: 4px 8px; }
+.rem { display: flex; justify-content: space-between; font-size: 14px;
+  border-top: 1px solid var(--border); padding-top: 8px; }
+.rem.over { color: var(--danger); font-weight: 600; }
+
+/* categories + settings */
+.sections { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 32px; }
+
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 500; padding: 4px 6px; }
+td { padding: 4px 6px; vertical-align: middle; }
+td.money, th.money { width: 150px; }
+td.act { width: 1%; white-space: nowrap; }
+.money-input { position: relative; }
+.money-input::before { content: "$"; position: absolute; left: 10px; top: 50%;
+  transform: translateY(-50%); color: var(--muted); pointer-events: none; }
+.money-input input { padding-left: 20px; text-align: right; }
+input.overridden { border-color: var(--accent); background: var(--accent-soft); }
+
+/* messages */
+#toast {
+  position: fixed; left: 50%; bottom: 20px; transform: translateX(-50%);
+  max-width: min(640px, calc(100vw - 32px)); background: var(--danger-soft); color: var(--text);
+  border: 1px solid var(--danger); border-radius: 10px; padding: 12px 40px 12px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.15); display: none; z-index: 50;
+}
+#toast.show { display: block; }
+#toast.info { background: var(--accent-soft); border-color: var(--accent); }
+#toast button { position: absolute; right: 6px; top: 6px; }
+
+/* dialog */
+dialog {
+  border: 1px solid var(--border); border-radius: 14px; padding: 0; background: var(--surface);
+  color: var(--text); width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 40px);
+}
+dialog::backdrop { background: rgba(0,0,0,.45); }
+.dlg-head { display: flex; align-items: center; gap: 8px; padding: 14px 18px;
+  border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
+.dlg-head h2 { margin: 0; flex: 1; }
+.dlg-body { padding: 18px; display: grid; gap: 18px; }
+.summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+.summary .stat { min-width: 0; }
+.summary .stat.over { border-color: var(--danger); background: var(--danger-soft); }
+.summary .stat.over .v { color: var(--danger); }
+.alert { background: var(--danger-soft); border: 1px solid var(--danger); border-radius: 10px;
+  padding: 10px 12px; font-weight: 500; }
+.alloc-row { display: flex; gap: 10px; align-items: flex-end; flex-wrap: wrap; }
+.alloc-row .money-input { width: 180px; }
+label.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; }
+.hint { font-size: 13px; color: var(--muted); }
+
+/* setup */
+.setup { max-width: 460px; margin: 8vh auto 0; }
+.field { display: grid; gap: 4px; margin-bottom: 14px; }
+.field label { font-size: 13px; color: var(--muted); }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 14px; }
+.term-row .three { margin-bottom: 0; }
+@media (max-width: 520px) { .three { grid-template-columns: 1fr; } }
+@media (max-width: 520px) {
+  .month-col { width: 110px; }
+  .summary { grid-template-columns: 1fr; }
+  td.money, th.money { width: 110px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><p class="muted">Loading…</p></div>
+
+<dialog id="monthDlg"></dialog>
+<dialog id="termDlg"></dialog>
+
+<dialog id="resetDlg">
+  <div class="dlg-head"><h2>Reset everything?</h2></div>
+  <div class="dlg-body">
+    <p style="margin:0">This deletes the term total, every month, and every category, then takes you back to setup.
+      The last save is kept in <code>data/budget.backup.json</code> in case you change your mind.</p>
+    <div class="field" style="margin:0">
+      <label for="resetConfirm">Type <b>RESET</b> to confirm</label>
+      <input type="text" id="resetConfirm" autocomplete="off">
+    </div>
+    <div style="display:flex; gap:8px; justify-content:flex-end">
+      <button type="button" id="resetCancel">Cancel</button>
+      <button type="button" class="danger" id="resetGo" disabled>Reset everything</button>
+    </div>
+  </div>
+</dialog>
+
+<div id="toast" role="alert"><span id="toastMsg"></span><button class="link" aria-label="Dismiss" id="toastX">✕</button></div>
+
+<script>
+"use strict";
+let budget = null;      // server summary, or null before setup
+let openMonth = null;   // index of the month in the editor
+let termOpen = false;   // is the Edit term dialog showing
+let termView = null;    // wide view inside Edit term: null, "optimize", "paid" or "request"
+let reqState = {as_of: null, through: null, include_expected: false, payer: "",
+  exclude: (() => { try { return JSON.parse(localStorage.getItem("requestExclude") || "[]"); } catch (e) { return []; } })()};
+function saveExclude() {
+  try { localStorage.setItem("requestExclude", JSON.stringify(reqState.exclude)); } catch (e) { /* not saved, still works */ }
+}
+const quarterDates = {}; // quarter label -> "as of" date chosen in its header
+let paidDraft = {received: true, date: today(), amount: "", from: "", to: "", payer: ""};
+function today() { return new Date().toLocaleDateString("en-CA"); } // YYYY-MM-DD, local time
+const itemsOpen = new Set(); // quarters whose expense list the user opened
+const folded = new Set((() => { try { return JSON.parse(localStorage.getItem("foldedQuarters") || "[]"); } catch (e) { return []; } })());
+function toggleFold(label) {
+  folded.has(label) ? folded.delete(label) : folded.add(label);
+  try { localStorage.setItem("foldedQuarters", JSON.stringify([...folded])); } catch (e) { /* not saved, still works */ }
+  render();
+}
+let quarterOptions = []; // [{label, months: ["YYYY-MM"]}] from the server
+let needsRestart = false;   // the app's code changed after it started
+
+const $ = (sel, root = document) => root.querySelector(sel);
+const esc = s => String(s).replace(/[&<>"']/g, c =>
+  ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"}[c]));
+
+// Display only. All money math happens on the server in integer cents.
+function money(cents) {
+  const sign = cents < 0 ? "-" : "";
+  const abs = Math.abs(cents);
+  return `${sign}$${Math.floor(abs / 100).toLocaleString("en-US")}.${String(abs % 100).padStart(2, "0")}`;
+}
+const plain = cents => `${Math.floor(cents / 100)}.${String(cents % 100).padStart(2, "0")}`;
+
+// ---------------------------------------------------------------- server
+
+// How the page reaches the planner. Locally that's budget.py on this computer.
+// The website build (make_site.py) loads web.js first, which sets
+// window.BudgetTransport to talk to the online API instead.
+const post = async (path, body) => (await fetch(path, {
+  method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body),
+})).json();
+const transport = window.BudgetTransport || {
+  state: async () => (await fetch("/api/state")).json(),
+  action: body => post("/api/action", body),
+  query: body => post("/api/query", body),
+  unreachable: "Couldn't reach the planner. Is python budget.py still running?",
+  resetNote: "Budget reset. The previous save is in data/budget.backup.json.",
+};
+// The website can also hand over a newer view on its own (edits made in another tab).
+transport.onUpdate = data => {
+  budget = data.budget;
+  quarterOptions = data.quarter_options || quarterOptions;
+  render();
+};
+
+async function call(action) {
+  let data;
+  try {
+    data = await transport.action(action);
+  } catch (e) {
+    showToast(e.message || transport.unreachable);
+    return false;
+  }
+  if (!data.ok) {
+    if (data.budget !== undefined) budget = data.budget;  // the website sends the latest view with its errors
+    showToast(data.error || "Something went wrong."); render(); return false;
+  }
+  hideToast();
+  budget = data.budget;
+  quarterOptions = data.quarter_options || quarterOptions;
+  needsRestart = !!data.needs_restart;
+  render();
+  return true;
+}
+
+// Ask the server something without changing anything (live previews).
+async function ask(question) {
+  try {
+    const data = await transport.query(question);
+    return data.ok ? {answer: data.answer} : {error: data.error};
+  } catch (e) {
+    return {error: e.message || "Couldn't reach the planner."};
+  }
+}
+
+async function load() {
+  try {
+    const data = await transport.state();
+    if (!data) return;  // the website is showing its login screen; it calls load() again after
+    budget = data.budget;
+    quarterOptions = data.quarter_options || [];
+    needsRestart = !!data.needs_restart;
+    render();
+  } catch (e) {
+    $("#app").innerHTML = window.BudgetTransport ? `<p>${esc(e.message || transport.unreachable)}</p>`
+      : `<p>Couldn't reach the planner. Start it with <code>python budget.py</code>.</p>`;
+  }
+}
+
+// ---------------------------------------------------------------- toast
+
+let toastTimer;
+function showToast(msg, kind = "error") {
+  $("#toastMsg").textContent = msg;
+  $("#toast").className = "show" + (kind === "info" ? " info" : "");
+  clearTimeout(toastTimer);
+  if (kind === "info") toastTimer = setTimeout(hideToast, 2500);
+}
+function hideToast() { $("#toast").className = ""; }
+$("#toastX").onclick = hideToast;
+
+// ---------------------------------------------------------------- render
+
+function render() {
+  // Keep focus on the same field across re-renders (e.g. tabbing through amounts).
+  const key = document.activeElement?.dataset?.key;
+  if (!budget) renderSetup(); else renderDashboard();
+  if (needsRestart) $("#app").insertAdjacentHTML("afterbegin", `<div class="restart-banner" role="status">
+    <b>The planner was updated.</b> Restart it to finish: press Ctrl+C in its terminal, then run <code>python3 budget.py</code>. Until then, new features may not work.</div>`);
+  if (openMonth !== null && budget) renderMonth(); else if ($("#monthDlg").open) $("#monthDlg").close();
+  if (termOpen && budget) renderTerm(); else if ($("#termDlg").open) $("#termDlg").close();
+  if (key) { const el = document.querySelector(`[data-key="${CSS.escape(key)}"]`); if (el) el.focus(); }
+}
+
+// First quarter, last quarter, and the month the plan starts (a month of the first quarter).
+function quarterPickers(id, first, last, start) {
+  const opts = sel => quarterOptions.map(q =>
+    `<option value="${esc(q.label)}" ${q.label === sel ? "selected" : ""}>${esc(q.label)}</option>`).join("");
+  return `
+    <div class="three">
+      <div class="field" style="margin:0"><label for="${id}First" class="hint">First quarter</label><select id="${id}First">${opts(first)}</select></div>
+      <div class="field" style="margin:0"><label for="${id}Last" class="hint">Last quarter</label><select id="${id}Last">${opts(last)}</select></div>
+      <div class="field" style="margin:0"><label for="${id}Start" class="hint">Plan starts</label><select id="${id}Start" data-start="${esc(start)}"></select></div>
+    </div>`;
+}
+function wireQuarterPickers(id) {
+  const fill = () => {
+    const q = quarterOptions.find(q => q.label === $(`#${id}First`).value);
+    const want = $(`#${id}Start`).value || $(`#${id}Start`).dataset.start;
+    $(`#${id}Start`).innerHTML = (q ? q.months : []).map(k =>
+      `<option value="${k}" ${k === want ? "selected" : ""}>${monthName(k)}</option>`).join("");
+  };
+  $(`#${id}First`).onchange = () => { $(`#${id}Start`).value = ""; $(`#${id}Start`).dataset.start = ""; fill(); };
+  fill();
+  return () => ({first_quarter: $(`#${id}First`).value, last_quarter: $(`#${id}Last`).value, start: $(`#${id}Start`).value});
+}
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const quarterLabel = k => {
+  const m = +k.slice(5), y = k.slice(0, 4);
+  return `${m >= 9 ? "Fall" : m <= 3 ? "Winter" : m <= 6 ? "Spring" : "Summer"} ${y}`;
+};
+const monthName = k => `${MONTHS[+k.slice(5) - 1]} ${k.slice(0, 4)}`;
+
+function renderSetup() {
+  $("#app").innerHTML = `
+    <div class="setup panel">
+      <h1>Set up your term budget</h1>
+      <p class="muted">Enter everything you have for the term, tuition included. Tuition is set aside first, and the rest is split evenly across the months.</p>
+      <form id="setupForm">
+        <div class="field">
+          <label for="sTotal">Term total</label>
+          <div class="money-input"><input type="text" id="sTotal" inputmode="decimal" placeholder="0.00" required></div>
+        </div>
+        <div class="field">
+          <label for="sTuition">Tuition per quarter</label>
+          <div class="money-input"><input type="text" id="sTuition" inputmode="decimal" placeholder="0.00" required></div>
+          <span class="hint">Fall, Winter and Spring each get a payment; Summer has none. UCSC 2026-27 due dates: Fall Sep 17, Winter Dec 16, Spring Mar 23. You can change any of it later.</span>
+        </div>
+        ${quarterPickers("s", "Fall 2026", "Summer 2027", "2026-09")}
+        <p class="hint">Starting partway into a quarter is fine. That quarter's tuition is still included.</p>
+        <button class="primary" type="submit" style="width:100%">Create budget</button>
+      </form>
+    </div>`;
+  const term = wireQuarterPickers("s");
+  $("#setupForm").onsubmit = e => {
+    e.preventDefault();
+    call({type: "setup", total: $("#sTotal").value, tuition: $("#sTuition").value, ...term()});
+  };
+  $("#sTotal").focus();
+}
+
+function monthCard(m) {
+  const pct = m.alloc > 0 ? Math.min(100, m.used / m.alloc * 100) : (m.used > 0 ? 100 : 0);
+  const cats = m.categories.length
+    ? m.categories.map(c => `<div class="row ${budget.categories.find(x => x.id === c.id).extra ? "extra" : ""} ${c.boost ? "boosted" : ""}" ${c.boost ? `title="Your ${money(c.base)} + ${money(c.boost)} from Optimize"` : ""}><span>${esc(c.name)}${c.overridden ? " *" : ""}</span><span class="num">${money(c.amount)}</span></div>`).join("")
+    : (m.items.length ? "" : `<div class="row"><span>No categories yet</span></div>`);
+  const items = m.items.map(it =>
+    `<div class="row item"><span>${esc(it.name)}</span><span class="num">${money(it.amount)}</span></div>`).join("");
+  return `
+    <button class="card ${m.over ? "over" : ""} ${m.key === today().slice(0, 7) ? "current" : ""}" data-month="${m.index}" type="button">
+      <div class="top"><span class="name">${esc(m.label)}</span>
+        <span>${m.key === today().slice(0, 7) ? `<span class="badge now">This month</span> ` : ""}${m.locked ? `<span class="badge lock">Locked</span>` : ""}${m.over ? ` <span class="badge bad">Over</span>` : ""}</span></div>
+      <div class="alloc num">${money(m.alloc)}</div>
+      ${m.extra ? `<div class="hint num" style="margin-top:-6px" title="Paid by money on top of the term total">incl. ${money(m.extra)} extra</div>` : ""}
+      ${m.tuition_due.map(p => `<div class="tuition-line num"><span>Pay ${esc(p.label.split(" ")[0])} tuition by ${esc(p.due_label.replace(/, \d{4}$/, ""))}</span><span>${money(p.amount)}</span></div>`).join("")}
+      <div class="bar" title="Categories and expenses use ${Math.round(pct)}% of this month"><div style="width:${pct}%"></div></div>
+      <div class="cats">${cats}${items}</div>
+      ${m.over ? `<div class="rem num over">
+        <span>Over by</span><span>${money(-m.remainder)}</span></div>` : ""}
+      ${m.over && m.soft ? `<div class="hint fixable">Re-optimize can take back up to ${money(Math.min(m.soft, -m.remainder))}</div>` : ""}
+    </button>`;
+}
+
+// A bar split into tuition and spending, so each level shows where its money goes.
+function splitBar(tuition, spending) {
+  const all = tuition + spending;
+  if (all <= 0) return "";
+  const t = tuition / all * 100;
+  return `<div class="split" aria-hidden="true"><div class="t" style="width:${t}%"></div><div class="s" style="width:${100 - t}%"></div></div>`;
+}
+
+// One-off expenses for a quarter. Each sits in one month and uses up part of that month's budget.
+function quarterItems(b, q) {
+  const monthOpts = sel => q.month_keys.map(k =>
+    `<option value="${k}" ${k === sel ? "selected" : ""}>${esc(monthName(k))}</option>`).join("");
+  const rows = q.items.map(it => `
+    <tr>
+      <td><input type="text" value="${esc(it.name)}" data-key="iname-${it.id}" data-item-name="${it.id}" aria-label="Expense name"></td>
+      <td class="month-col"><select data-key="imon-${it.id}" data-item-month="${it.id}" aria-label="${esc(it.name)} month">${monthOpts(it.month)}</select></td>
+      <td class="money"><div class="money-input"><input type="text" inputmode="decimal" value="${plain(it.amount)}" data-key="iamt-${it.id}" data-item-amount="${it.id}" aria-label="${esc(it.name)} amount"></div></td>
+      <td class="act"><button type="button" class="link" data-item-delete="${it.id}" style="color:var(--danger)">Delete</button></td>
+    </tr>`).join("");
+  const id = q.label.replace(/\W/g, "");
+  return `
+    <details class="q-items" data-items-for="${esc(q.label)}">
+      <summary><span><b>Individual expenses</b>${q.items.length ? ` <span class="hint">· ${q.items.length}</span>` : ""}</span>
+        <span class="num">${q.items.length ? money(q.items_total) : `<span class="hint">None yet, add one</span>`}</span></summary>
+      <table>
+        <thead><tr><th>Expense</th><th class="month-col">Month</th><th class="money">Amount</th><th></th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr>
+          <td><input type="text" id="newItemName${id}" placeholder="e.g. Tournament travel" data-key="new-iname-${id}" aria-label="New expense name"></td>
+          <td class="month-col"><select id="newItemMonth${id}" data-key="new-imon-${id}" aria-label="New expense month">${monthOpts(q.month_keys[0])}</select></td>
+          <td class="money"><div class="money-input"><input type="text" inputmode="decimal" id="newItemAmount${id}" placeholder="0.00" data-key="new-iamt-${id}" aria-label="New expense amount"></div></td>
+          <td class="act"><button type="button" class="primary" data-item-add="${id}">Add</button></td>
+        </tr></tfoot>
+      </table>
+      <p class="hint" style="margin:6px 0 0">Comes out of that month's budget, like a category. Nothing moves between months.</p>
+    </details>`;
+}
+
+async function fillQuarterLeft(label) {
+  const date = quarterDates[label] || today();
+  const out = document.querySelector(`[data-qleft="${CSS.escape(label)}"]`);
+  if (!out || !date) return;
+  const {answer: a, error} = await ask({type: "quarter_left", quarter: label, date});
+  if (!out.isConnected) return;
+  if (error) { out.innerHTML = `<span class="hint">unavailable</span>`; return; }
+  out.innerHTML = a.ended ? `<b>$0.00</b> <span class="hint">· quarter is over</span>`
+    : `<b>${money(a.total)}</b> <span class="hint">· ${money(a.spending)} of ${money(a.of)} spending${a.tuition ? ` + ${money(a.tuition)} tuition not due yet` : ""}</span>`;
+}
+
+// Quarter colors, start to end. The quarter's days are divided evenly by the
+// number of colors, so each color gets the same number of days; between two
+// colors the border blends day by day. The last color holds through the end.
+const QUARTER_COLORS = ["#22d3ee", "#facc15", "#3b82f6", "#22c55e", "#8b5a2b", "#dc143c"];
+const SEASON_SPAN = {Winter: [1, 3], Spring: [4, 6], Summer: [7, 8], Fall: [9, 12]};
+
+function dayNumber(iso) { // days since 1970, ignoring time zones and daylight saving
+  const [y, m, d] = iso.split("-").map(Number);
+  return Date.UTC(y, m - 1, d) / 86400000;
+}
+function mix(a, b, t) {
+  const ch = (h, i) => parseInt(h.slice(1 + 2 * i, 3 + 2 * i), 16);
+  return "#" + [0, 1, 2].map(i => Math.round(ch(a, i) + (ch(b, i) - ch(a, i)) * t)
+    .toString(16).padStart(2, "0")).join("");
+}
+function quarterProgress(label, todayIso) {
+  const [season, year] = label.split(" ");
+  const [m1, m2] = SEASON_SPAN[season];
+  const start = dayNumber(`${year}-${String(m1).padStart(2, "0")}-01`);
+  const end = Date.UTC(+year, m2, 0) / 86400000; // last day of the last month
+  const now = dayNumber(todayIso);
+  if (now < start || now > end) return {now: false};
+  const total = end - start + 1, day = now - start + 1;
+  const step = total / QUARTER_COLORS.length;          // days between colors
+  const pos = Math.min((day - 1) / step, QUARTER_COLORS.length - 1);
+  const i = Math.floor(pos);
+  const color = i >= QUARTER_COLORS.length - 1 ? QUARTER_COLORS.at(-1)
+    : mix(QUARTER_COLORS[i], QUARTER_COLORS[i + 1], pos - i);
+  return {now: true, day, total, color, frac: (day - 1) / Math.max(total - 1, 1), step: Math.round(step)};
+}
+
+function quarterNode(b, q) {
+  const t = q.tuition;
+  const tuition = t ? `
+      <div class="q-tuition">
+        <div class="k">Tuition</div>
+        <div class="money-input"><input type="text" inputmode="decimal" value="${plain(t.amount)}"
+          data-key="tamt-${t.id}" data-tuition-amount="${t.id}" aria-label="${esc(t.label)} tuition"></div>
+        <label class="hint">due <input type="date" value="${esc(t.due || "")}" data-key="tdue-${t.id}" data-tuition-due="${t.id}" aria-label="${esc(t.label)} due date"></label>
+        ${t.before_start ? `<span class="hint">Due before the plan starts</span>` : ""}${t.due ? "" : `<span class="hint">No due date set</span>`}
+      </div>` : `
+      <div class="q-tuition none"><div class="k">Tuition</div><div class="muted">${q.label.startsWith("Summer") ? "None, summer break" : "None"}</div></div>`;
+  const qp = quarterProgress(q.label, today());
+  if (folded.has(q.label)) return `
+    <section class="branch folded">
+      <button type="button" class="node quarter q-folded ${q.over ? "over" : ""} ${qp.now ? "now" : ""}" ${qp.now ? `style="--q-color: ${qp.color}"` : ""}
+        data-qfold="${esc(q.label)}" aria-expanded="false" title="Open ${esc(q.label)}">
+        <span class="q-fold-name"><span class="chev">▸</span> <b>${esc(q.label)}</b>
+          ${qp.now ? `<span class="badge now-q">Now · day ${qp.day} of ${qp.total}</span>` : ""}
+          ${q.over ? `<span class="badge bad">Over</span>` : ""}
+          <span class="hint">${q.months.length} month${q.months.length === 1 ? "" : "s"}${q.tuition ? ` · tuition ${money(q.tuition.amount)}` : ""}</span></span>
+        <span class="q-fold-stats num">
+          <span><span class="hint">${q.unallocated < 0 ? "Over by" : "Unallocated"}</span> <b class="${q.unallocated < 0 ? "neg-text" : ""}">${money(Math.abs(q.unallocated))}</b></span>
+          <span><span class="hint">Quarter total</span> <b>${money(q.total)}</b></span>
+        </span>
+      </button>
+    </section>`;
+  return `
+    <section class="branch">
+      <div class="node quarter ${q.over ? "over" : ""} ${qp.now ? "now" : ""}" ${qp.now ? `style="--q-color: ${qp.color}"` : ""}>
+        <div class="q-head">
+          <div class="q-info">
+            <h2><button type="button" class="q-fold" data-qfold="${esc(q.label)}" aria-expanded="true" title="Fold ${esc(q.label)}">▾</button>${esc(q.label)}${qp.now ? ` <span class="badge now-q">Now · day ${qp.day} of ${qp.total}</span>` : ""}</h2>
+            <div class="hint">${q.classes ? `Classes ${esc(q.classes)}` : ""}${q.classes ? " · " : ""}${q.months.length} month${q.months.length === 1 ? "" : "s"}</div>
+            <div class="q-left">
+              <label class="hint">Left as of <input type="date" value="${esc(quarterDates[q.label] || today())}" data-key="qdate-${esc(q.label)}" data-qdate="${esc(q.label)}" aria-label="${esc(q.label)}: show what's left as of this date"></label>
+              <span class="num" data-qleft="${esc(q.label)}"><span class="hint">…</span></span>
+            </div>
+          <div class="node-stats q-stats">
+            <div class="chip"><div class="k">Spending</div><div class="v num">${money(q.spending)}</div></div>
+            <div class="chip ${q.unallocated < 0 ? "neg" : ""}" title="Assigned to this quarter's months minus everything planned in them. New expenses in the quarter come out of this.">
+              <div class="k">${q.unallocated < 0 ? "Over by" : "Unallocated"}</div><div class="v num">${money(Math.abs(q.unallocated))}</div></div>
+            <div class="chip strong"><div class="k">Quarter total</div><div class="v num">${money(q.total)}</div></div>
+          </div>
+          </div>
+          ${tuition}
+        </div>
+        ${qp.now ? `<div class="q-progress" title="Day ${qp.day} of ${qp.total}: about ${qp.step} days between colors">
+          <div class="q-progress-track"></div><div class="q-progress-mark" style="left:${qp.frac * 100}%"></div></div>` : ""}
+        ${splitBar(q.tuition_amount, q.spending)}
+        ${quarterItems(b, q)}
+      </div>
+      <div class="children">
+        <div class="grid">${q.months.map(i => monthCard(b.months[i])).join("")}</div>
+      </div>
+    </section>`;
+}
+
+function renderDashboard() {
+  const b = budget, m0 = b.months[0], mN = b.months[b.months.length - 1];
+  const catRows = b.categories.map(c => `
+    <tr>
+      <td><input type="text" value="${esc(c.name)}" data-key="cname-${c.id}" data-cat-name="${c.id}" aria-label="Category name"></td>
+      <td class="money"><div class="money-input"><input type="text" inputmode="decimal" value="${plain(c.default)}" data-key="cdef-${c.id}" data-cat-default="${c.id}" aria-label="Default monthly amount for ${esc(c.name)}" ${c.static ? "disabled" : ""}></div></td>
+      <td class="static-col"><label class="toggle" title="Static categories can't be changed, and the optimizer leaves them alone"><input type="checkbox" data-key="cstatic-${c.id}" data-cat-static="${c.id}" ${c.static ? "checked" : ""}> Static</label>
+        <label class="toggle" title="Paid by extra money on top of the term total, like gas money. Raises Total available and the month instead of using it up."><input type="checkbox" data-key="cextra-${c.id}" data-cat-extra="${c.id}" ${c.extra ? "checked" : ""}> Adds to total</label></td>
+      <td class="act">${c.static ? `<span class="hint">Locked</span>` : `<button type="button" class="link" data-cat-delete="${c.id}" style="color:var(--danger)">Delete</button>`}</td>
+    </tr>`).join("");
+
+  $("#app").innerHTML = `
+    <div class="node term">
+      <div class="node-head">
+        <div>
+          <div class="eyebrow">Term</div>
+          <h1>${esc(b.first_quarter)} to ${esc(b.last_quarter)}</h1>
+          <div class="hint">${b.quarters.length} quarters · ${b.months.length} months, ${esc(m0.label)} to ${esc(mN.label)}</div>
+        </div>
+        <div class="node-stats">
+          <div class="chip strong" title="${b.extra_total ? `Term total ${money(b.total)} + ${money(b.extra_total)} on top (${esc(b.extra_names.join(", "))})` : "The term total"}">
+            <div class="k">Total available</div><div class="v num">${money(b.available)}</div>
+            ${b.extra_total ? `<div class="sub num">incl. ${money(b.extra_total)} ${esc(b.extra_names.join(", "))}</div>` : ""}</div>
+          <div class="chip ${b.left < 0 ? "neg" : "strong"}" title="Total available minus tuition minus every category in every month">
+            <div class="k">Total left</div><div class="v num">${money(b.left)}</div></div>
+          <div class="chip tuition"><div class="k">Tuition, ${b.tuition.length} quarter${b.tuition.length === 1 ? "" : "s"}</div><div class="v num">${money(b.tuition_total)}</div></div>
+          <div class="chip"><div class="k">Spending</div><div class="v num">${money(b.month_sum + b.extra_total)}</div></div>
+          <div class="chip" title="Tuition plus every month should equal the term total"><div class="k">Check</div><div class="v">${b.matches
+            ? `<span class="badge ok">Adds up</span>`
+            : `<span class="badge bad">Off by ${money(Math.abs(b.month_sum + b.tuition_total - b.total))}</span>`}</div></div>
+          <button type="button" class="primary" id="termOpen">Edit term</button>
+        </div>
+      </div>
+      ${splitBar(b.tuition_total, b.month_sum + b.extra_total)}
+      ${b.optimize.take ? `<div class="notice reopt"><span>Some months went over after optimizing. Re-optimizing takes back ${money(b.optimize.take)} of Optimize's extra${b.optimize.give ? ` and adds ${money(b.optimize.give)} where there's room` : ""}, never going below your own amounts.</span>
+        <button type="button" class="primary" id="reoptOpen">Review and re-optimize</button></div>` : ""}
+      <div class="legend hint"><span><i class="sw t"></i>Tuition</span><span><i class="sw s"></i>Spending</span></div>
+    </div>
+    <div class="tree">${b.quarters.map(q => quarterNode(b, q)).join("")}</div>
+    <div class="sections">
+      <section class="panel">
+        <h2>Categories</h2>
+        <p class="hint" style="margin-top:-6px">Defaults apply to every month. Override a single month by clicking its card. Overrides are marked with *. Check Static for anything fixed, like rent: it locks the amounts and Optimize (in Edit term) leaves it alone. Check Adds to total for anything paid by money on top of the term total, like gas: it raises Total available and the month instead of using them up.</p>
+        <table>
+          <thead><tr><th>Name</th><th class="money">Default per month</th><th class="static-col"></th><th></th></tr></thead>
+          <tbody>${catRows || `<tr><td colspan="4" class="muted">No categories yet. Add one below.</td></tr>`}</tbody>
+          <tfoot><tr>
+            <td><input type="text" id="newCatName" placeholder="e.g. Food" data-key="new-name" aria-label="New category name"></td>
+            <td class="money"><div class="money-input"><input type="text" id="newCatDefault" inputmode="decimal" placeholder="0.00" data-key="new-default" aria-label="New category default"></div></td>
+            <td class="static-col"></td>
+            <td class="act"><button type="button" class="primary" id="addCat">Add</button></td>
+          </tr></tfoot>
+        </table>
+      </section>
+    </div>`;
+
+  document.querySelectorAll("[data-qfold]").forEach(el => el.onclick = () => toggleFold(el.dataset.qfold));
+  document.querySelectorAll("[data-qdate]").forEach(el => {
+    el.onchange = () => { quarterDates[el.dataset.qdate] = el.value; fillQuarterLeft(el.dataset.qdate); };
+    fillQuarterLeft(el.dataset.qdate);
+  });
+  document.querySelectorAll("[data-month]").forEach(el =>
+    el.onclick = () => { openMonth = +el.dataset.month; renderMonth(); });
+  document.querySelectorAll("[data-tuition-amount]").forEach(el => el.onchange = () =>
+    call({type: "set_tuition", id: el.dataset.tuitionAmount, amount: el.value}));
+  document.querySelectorAll("[data-item-name]").forEach(el => el.onchange = () =>
+    call({type: "update_item", id: el.dataset.itemName, name: el.value}));
+  document.querySelectorAll("[data-item-month]").forEach(el => el.onchange = () =>
+    call({type: "update_item", id: el.dataset.itemMonth, month: el.value}));
+  document.querySelectorAll("[data-item-amount]").forEach(el => el.onchange = () =>
+    call({type: "update_item", id: el.dataset.itemAmount, amount: el.value}));
+  document.querySelectorAll("[data-item-delete]").forEach(el => el.onclick = () => {
+    const name = el.closest("tr").querySelector("[data-item-name]").value;
+    if (confirm(`Delete "${name}"?`)) call({type: "delete_item", id: el.dataset.itemDelete});
+  });
+  document.querySelectorAll("[data-item-add]").forEach(el => {
+    const id = el.dataset.itemAdd;
+    const add = async () => {
+      const name = $(`#newItemName${id}`).value.trim();
+      if (!name) return showToast("Give the expense a name first.");
+      const amount = $(`#newItemAmount${id}`).value.trim();
+      if (!amount) return showToast("Enter how much it costs.");
+      if (await call({type: "add_item", name, month: $(`#newItemMonth${id}`).value, amount}))
+        $(`#newItemName${id}`)?.focus();
+    };
+    el.onclick = add;
+    $(`#newItemName${id}`).onkeydown = $(`#newItemAmount${id}`).onkeydown = e => { if (e.key === "Enter") add(); };
+  });
+  // Remember which expense lists are open across re-renders.
+  document.querySelectorAll("details[data-items-for]").forEach(el => {
+    if (itemsOpen.has(el.dataset.itemsFor)) el.open = true;
+    el.ontoggle = () => el.open ? itemsOpen.add(el.dataset.itemsFor) : itemsOpen.delete(el.dataset.itemsFor);
+  });
+  document.querySelectorAll("[data-tuition-due]").forEach(el => el.onchange = () =>
+    call({type: "set_tuition_due", id: el.dataset.tuitionDue, due: el.value}));
+  document.querySelectorAll("[data-cat-name]").forEach(el => el.onchange = () =>
+    call({type: "rename_category", id: el.dataset.catName, name: el.value}));
+  document.querySelectorAll("[data-cat-default]").forEach(el => el.onchange = () =>
+    call({type: "set_category_default", id: el.dataset.catDefault, default: el.value}));
+  document.querySelectorAll("[data-cat-extra]").forEach(el => el.onchange = () =>
+    call({type: "set_category_extra", id: el.dataset.catExtra, extra: el.checked}));
+  document.querySelectorAll("[data-cat-static]").forEach(el => el.onchange = () =>
+    call({type: "set_category_static", id: el.dataset.catStatic, static: el.checked}));
+  document.querySelectorAll("[data-cat-delete]").forEach(el => el.onclick = () => {
+    const c = b.categories.find(c => c.id === el.dataset.catDelete);
+    if (confirm(`Delete "${c.name}" from every month? Any month overrides for it are removed too.`))
+      call({type: "delete_category", id: c.id});
+  });
+  const add = async () => {
+    const name = $("#newCatName").value.trim();
+    if (!name) return showToast("Give the category a name first.");
+    if (await call({type: "add_category", name, default: $("#newCatDefault").value || "0"}))
+      $("#newCatName").focus();
+  };
+  $("#addCat").onclick = add;
+  $("#newCatName").onkeydown = $("#newCatDefault").onkeydown = e => { if (e.key === "Enter") add(); };
+  $("#termOpen").onclick = () => { termOpen = true; renderTerm(); };
+  $("#reoptOpen")?.addEventListener("click", () => { termOpen = true; termView = "optimize"; renderTerm(); });
+}
+
+// Optimizer: static categories next to dynamic ones (with sliders), the unallocated money
+// by quarter and month, and a preview of where it would go.
+function optimizerPanel(b) {
+  const o = b.optimize, cat = id => b.categories.find(c => c.id === id);
+  const weight = w => (w / 100).toFixed(2);
+  const statics = o.static.map(id => { const c = cat(id); return `
+      <li><span>${esc(c.name)}</span><span class="num">${money(c.default)} / month</span></li>`; }).join("")
+    || `<li class="muted">None yet. Check Static on a category at the bottom of the main page.</li>`;
+  const dyn = o.dynamic.map(d => { const c = cat(d.id); return `
+      <div class="slider-row">
+        <div class="slider-top"><span>${esc(c.name)}</span>
+          <span class="num"><b data-wlabel="${d.id}">${weight(d.weight)}</b> <span class="hint">· gets ${+(d.share * 100).toFixed(1)}% of the extra</span></span></div>
+        <input type="range" min="0" max="100" step="5" value="${d.weight}" data-key="w-${d.id}" data-weight="${d.id}" aria-label="How much to favor ${esc(c.name)}, 0 to 1">
+      </div>`; }).join("")
+    || `<p class="muted" style="margin:0">Every category is static, so there's nowhere to put extra money. Uncheck Static on one.</p>`;
+
+  const ids = o.dynamic.filter(d => d.weight > 0 || o.months.some(r => r.current[d.id])).map(d => d.id);
+  const free = f => f < 0 ? `<span class="neg-text">Over ${money(-f)}</span>` : money(f);
+  // "now -> new" when re-optimizing changes the extra, otherwise just the amount
+  const cell = (cur, nxt) => cur === nxt
+    ? (nxt ? `+${money(nxt)}` : `<span class="muted">$0.00</span>`)
+    : `<span class="muted">+${money(cur)}</span> → <b class="${nxt < cur ? "neg-text" : ""}">+${money(nxt)}</b>`;
+  const shift = v => !v ? `<span class="muted">none</span>`
+    : `<span class="${v < 0 ? "neg-text" : ""}">${v > 0 ? "+" : "−"}${money(Math.abs(v))}</span>`;
+  const after = a => a < 0 ? `<span class="neg-text">Still over ${money(-a)}</span>` : money(a);
+  const rows = o.quarters.map(q => `
+      <tr class="q-row"><td>${esc(q.label)}</td><td class="money num">${money(q.free)}</td><td class="money num"><span class="muted">even split</span></td>
+        ${ids.map(id => `<td class="money num">${cell(q.current[id], q.shares[id])}</td>`).join("")}
+        <td class="money num">${money(q.after)}${q.over ? ` <span class="neg-text">(${money(q.over)} over)</span>` : ""}</td></tr>
+      ${q.months.map(i => { const r = o.months[i]; return `
+      <tr><td class="indent">${esc(r.label)}</td><td class="money num">${free(r.free)}</td><td class="money num">${shift(r.move)}</td>
+        ${ids.map(id => `<td class="money num">${cell(r.current[id], r.shares[id])}</td>`).join("")}<td class="money num">${after(r.after)}</td></tr>`; }).join("")}`).join("");
+  const total = (key, id) => o.quarters.reduce((t, q) => t + (q[key][id] || 0), 0);
+  const label = !o.current ? `Move ${money(o.moved)} into dynamic categories`
+    : `Re-optimize${o.give ? `: add ${money(o.give)}` : ""}${o.take ? `${o.give ? "," : ":"} take back ${money(o.take)}` : ""}`;
+
+  return `
+    <div class="term-group optimizer">
+      <h3>Optimize unallocated money</h3>
+      <p class="hint" style="margin:-4px 0 4px">Each quarter's free money (allocations minus your own category amounts and expenses) is pooled and split evenly across its months, then across the dynamic categories by slider, as extra on top of your amounts. To make the even split fit, allocation shifts between months of the same quarter; quarters keep their totals and locked months keep their allocation. Run it again any time: it recalculates from scratch, so a new expense just shrinks the quarter's extra. It never goes below your own amounts and never touches static categories or expenses.</p>
+      <div class="opt-cols">
+        <div class="opt-col"><h4>Static <span class="hint">· can't change</span></h4><ul class="static-list">${statics}</ul></div>
+        <div class="opt-col"><h4>Dynamic <span class="hint">· 0 = skip, 1 = favor most</span></h4>${dyn}</div>
+      </div>
+      <div class="opt-table-wrap">
+        <table class="opt-table">
+          <thead><tr><th>Quarter / month</th><th class="money">Free money</th><th class="money" title="Allocation moved between months of the same quarter so each gets an even share">Allocation shift</th>
+            ${ids.map(id => `<th class="money">Extra for ${esc(cat(id).name)}</th>`).join("")}<th class="money">Left after</th></tr></thead>
+          <tbody>${rows}</tbody>
+          <tfoot><tr><td>Whole term</td><td class="money num">${money(o.free)}</td><td class="money num"><span class="muted">${o.moves ? `${money(o.moves)} moved` : "none"}</span></td>
+            ${ids.map(id => `<td class="money num">${cell(total("current", id), total("shares", id))}</td>`).join("")}
+            <td class="money num">${money(o.quarters.reduce((t, q) => t + q.after, 0))}</td></tr></tfoot>
+        </table>
+      </div>
+      ${o.still_over.length ? `<div class="alert">Still over even with no extra at all: ${o.still_over.map(x => `${esc(x.label)} by ${money(x.by)}`).join(", ")}. Optimizing won't go below your own amounts, so raise that month's allocation or lower a category or expense.</div>` : ""}
+      <div class="term-row">
+        <button type="button" class="primary" id="optApply" ${o.pending ? "" : "disabled"}>${label}</button>
+        ${o.current ? `<button type="button" class="ghost-danger" id="optClear">Un-optimize: remove ${money(o.current)} of extra</button>` : ""}
+        <p class="hint">${o.pending ? `Changes the Optimize extra in each month (hover a category on a card to see it)${o.moves ? ` and shifts ${money(o.moves)} of allocation within quarters` : ""}. Your own amounts stay as they are.` : "Already optimized. Nothing would change."}</p>
+      </div>
+    </div>`;
+}
+
+function wireOptimizer(b) {
+  document.querySelectorAll("[data-weight]").forEach(el => {
+    el.oninput = () => { $(`[data-wlabel="${el.dataset.weight}"]`).textContent = (el.value / 100).toFixed(2); };
+    el.onchange = () => call({type: "set_category_weight", id: el.dataset.weight, weight: +el.value});
+  });
+  $("#optClear")?.addEventListener("click", () => {
+    if (confirm(`Remove all ${money(b.optimize.current)} of Optimize's extra? Every category goes back to your own amounts, and that money shows as unallocated again. You can re-optimize any time.`))
+      call({type: "unoptimize"});
+  });
+  $("#optApply").onclick = () => {
+    const o = b.optimize;
+    const what = [o.give ? `add ${money(o.give)} of extra` : "", o.take ? `take back ${money(o.take)} of extra` : ""].filter(Boolean).join(" and ");
+    if (confirm(`${what ? what[0].toUpperCase() + what.slice(1) : "Update the extra"} across your dynamic categories${o.moves ? `, shifting ${money(o.moves)} of allocation between months of the same quarter so each gets an even share` : ""}? Your own category amounts don't change.`))
+      call({type: "optimize"});
+  };
+}
+
+// Money received: a log of payments in, what dates each one is for, whether
+// it covers the plan for those dates, who paid, and whether they were reimbursed.
+function paidPanel(b) {
+  const pd = b.paid, d = paidDraft;
+  const people = sel => `<option value="">Not set</option>` + pd.people.map(p =>
+    `<option value="${p.id}" ${p.id === sel ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+  const check = c => c.diff >= 0
+    ? `<span class="badge ok">${c.diff === 0 ? "Exactly enough" : `Enough, ${money(c.diff)} extra`}</span>`
+    : `<span class="badge bad">Short ${money(-c.diff)}</span>`;
+  const rows = pd.receipts.map(r => `
+    <tr>
+      <td><input type="checkbox" data-r="${r.id}" data-field="received" ${r.received ? "checked" : ""} aria-label="Received"></td>
+      <td><input type="date" value="${esc(r.date || "")}" data-key="rdate-${r.id}" data-r="${r.id}" data-field="date" ${r.received ? "" : "disabled"} aria-label="Date received"></td>
+      <td class="money"><div class="money-input"><input type="text" inputmode="decimal" value="${plain(r.amount)}" data-key="ramt-${r.id}" data-r="${r.id}" data-field="amount" aria-label="Amount"></div></td>
+      <td class="range"><input type="date" value="${esc(r.from)}" data-key="rfrom-${r.id}" data-r="${r.id}" data-field="from" aria-label="For, from">
+        <span class="hint">to</span> <input type="date" value="${esc(r.to)}" data-key="rto-${r.id}" data-r="${r.id}" data-field="to" aria-label="For, to"></td>
+      <td title="Plan needs ${money(r.check.total)} for these dates (${money(r.check.spending)} spending + ${money(r.check.tuition)} tuition)">${check(r.check)}</td>
+      <td><select data-key="rpayer-${r.id}" data-r="${r.id}" data-field="payer" aria-label="Who paid">${people(r.payer)}</select></td>
+      <td class="reimb"><label class="toggle"><input type="checkbox" data-r="${r.id}" data-field="reimbursed" ${r.reimbursed ? "checked" : ""}> ${r.reimbursed ? "" : "No"}</label>
+        ${r.reimbursed ? `<input type="date" value="${esc(r.reimbursed_date || "")}" data-key="rrdate-${r.id}" data-r="${r.id}" data-field="reimbursed_date" aria-label="Date reimbursed">` : ""}</td>
+      <td class="act"><button type="button" class="link" data-rdel="${r.id}" style="color:var(--danger)" aria-label="Delete this payment" title="Delete">✕</button></td>
+    </tr>`).join("");
+  const peopleRows = pd.people.map(p => `
+      <li><input type="text" value="${esc(p.name)}" data-key="pname-${p.id}" data-person="${p.id}" aria-label="Name">
+        <span class="hint">${p.uses} payment${p.uses === 1 ? "" : "s"}</span>
+        ${p.uses ? "" : `<button type="button" class="link" data-pdel="${p.id}" style="color:var(--danger)">Delete</button>`}</li>`).join("");
+  return `
+    <div class="term-group paid">
+      <h3>Money received</h3>
+      <p class="hint" style="margin:-4px 0 4px">Log money that comes in and the dates it's for. Each one is checked against what your plan needs for those dates: every month's budget scaled to the days covered, plus any tuition due in that range. This is a record only and doesn't change the plan.</p>
+      <div class="node-stats">
+        <div class="chip strong"><div class="k">Received</div><div class="v num">${money(pd.received)}</div></div>
+        <div class="chip"><div class="k">Expected, not received yet</div><div class="v num">${money(pd.expected)}</div></div>
+        <div class="chip tuition"><div class="k">Not reimbursed yet</div><div class="v num">${money(pd.not_reimbursed)}</div></div>
+        <div class="chip"><div class="k">Total available</div><div class="v num">${money(b.available)}</div></div>
+      </div>
+      <div class="opt-cols paid-cols">
+        <form class="opt-col" id="newReceipt">
+          <h4>Add a payment</h4>
+          <div class="paid-grid">
+            <div class="field" style="margin:0"><label class="hint" for="nrAmount">Amount</label><div class="money-input"><input type="text" inputmode="decimal" id="nrAmount" placeholder="0.00" value="${esc(d.amount)}" data-key="nr-amount"></div></div>
+            <div class="field" style="margin:0"><label class="hint" for="nrDate">Date received</label><input type="date" id="nrDate" value="${esc(d.date)}" ${d.received ? "" : "disabled"}></div>
+            <div class="field" style="margin:0"><label class="hint" for="nrFrom">For, from</label><input type="date" id="nrFrom" value="${esc(d.from)}"></div>
+            <div class="field" style="margin:0"><label class="hint" for="nrTo">To</label><input type="date" id="nrTo" value="${esc(d.to)}"></div>
+            <div class="field" style="margin:0"><label class="hint" for="nrPayer">Who paid</label><select id="nrPayer">${people(d.payer)}</select></div>
+            <label class="toggle received-box"><input type="checkbox" id="nrReceived" ${d.received ? "checked" : ""}> Received</label>
+          </div>
+          <div id="nrCheck" class="cov hint">Enter an amount and the dates it's for to check it against the plan.</div>
+          <div><button type="submit" class="primary">Add payment</button></div>
+        </form>
+        <div class="opt-col">
+          <h4>People who pay you</h4>
+          <ul class="people">${peopleRows || `<li class="muted">No names yet.</li>`}</ul>
+          <div class="term-row">
+            <input type="text" id="newPerson" placeholder="e.g. Mom" data-key="new-person" style="flex:1; min-width:140px" aria-label="New name">
+            <button type="button" class="primary" id="addPerson">Add name</button>
+          </div>
+        </div>
+      </div>
+      ${pd.receipts.length ? `
+      <div class="opt-table-wrap">
+        <table class="paid-table">
+          <thead><tr><th>Received</th><th>Date</th><th class="money">Amount</th><th>For</th><th>Covers it?</th><th>Who paid</th><th>Reimbursed</th><th></th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </div>` : `<p class="muted" style="margin:0">No payments logged yet.</p>`}
+    </div>`;
+}
+
+function wirePaid(b) {
+  const form = $("#newReceipt"), d = paidDraft;
+  const sync = () => {
+    d.received = $("#nrReceived").checked; d.date = $("#nrDate").value; d.amount = $("#nrAmount").value;
+    d.from = $("#nrFrom").value; d.to = $("#nrTo").value; d.payer = $("#nrPayer").value;
+    $("#nrDate").disabled = !d.received;
+  };
+  let seq = 0;
+  const preview = async () => {
+    sync();
+    const out = $("#nrCheck");
+    if (!d.from || !d.to) { out.innerHTML = "Enter an amount and the dates it's for to check it against the plan."; return; }
+    const mine = ++seq;
+    const {answer: c, error} = await ask({type: "coverage", amount: d.amount, from: d.from, to: d.to});
+    if (mine !== seq || !out.isConnected) return;
+    if (error) { out.innerHTML = `<span class="neg-text">${esc(error)}</span>`; return; }
+    const verdict = !d.amount ? "" : c.diff >= 0
+      ? ` <span class="badge ok">${c.diff === 0 ? "Exactly enough" : `Enough, ${money(c.diff)} extra`}</span>`
+      : ` <span class="badge bad">Short ${money(-c.diff)}</span>`;
+    out.innerHTML = `Your plan needs <b class="num">${money(c.total)}</b> for ${esc(c.label)}: ${money(c.spending)} spending${c.extra ? ` (incl. ${money(c.extra)} of ${esc(b.extra_names.join(", "))})` : ""} + ${money(c.tuition)} tuition due in that range.${verdict}`
+      + (c.outside ? `<br>Part of this range is outside the plan, so those days count as $0.00.` : "");
+  };
+  form.querySelectorAll("input, select").forEach(el => { el.oninput = preview; el.onchange = preview; });
+  preview();
+  form.onsubmit = async e => {
+    e.preventDefault(); sync();
+    const ok = await call({type: "add_receipt", received: d.received, date: d.received ? d.date : null,
+      amount: d.amount, from: d.from, to: d.to, payer: d.payer || null});
+    if (ok) paidDraft = {received: true, date: today(), amount: "", from: "", to: "", payer: d.payer}, renderTerm();
+  };
+
+  const dlg = $("#termDlg");
+  dlg.querySelectorAll("[data-r]").forEach(el => el.onchange = () => {
+    const f = el.dataset.field;
+    const v = el.type === "checkbox" ? el.checked : el.value;
+    const change = {[f]: v === "" ? null : v};
+    if (f === "reimbursed" && v) change.reimbursed_date = today();
+    call({type: "update_receipt", id: el.dataset.r, ...change});
+  });
+  dlg.querySelectorAll("[data-rdel]").forEach(el => el.onclick = () => {
+    if (confirm("Delete this payment from the log?")) call({type: "delete_receipt", id: el.dataset.rdel});
+  });
+  dlg.querySelectorAll("[data-person]").forEach(el => el.onchange = () =>
+    call({type: "rename_person", id: el.dataset.person, name: el.value}));
+  dlg.querySelectorAll("[data-pdel]").forEach(el => el.onclick = () =>
+    call({type: "delete_person", id: el.dataset.pdel}));
+  const addPerson = async () => {
+    const name = $("#newPerson").value.trim();
+    if (!name) return showToast("Type a name first.");
+    sync();
+    if (await call({type: "add_person", name})) $("#newPerson")?.focus();
+  };
+  $("#addPerson").onclick = addPerson;
+  $("#newPerson").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); addPerson(); } };
+}
+
+// Request: how much to ask for through the end of a whole month or quarter,
+// after what's left of the money already received.
+function requestPanel(b) {
+  const people = b.paid.people.map(p =>
+    `<option value="${p.id}" ${p.id === reqState.payer ? "selected" : ""}>${esc(p.name)}</option>`).join("");
+  return `
+    <div class="term-group request">
+      <h3>Request money</h3>
+      <p class="hint" style="margin:-4px 0 4px">Pick whole months or quarters to cover, from the start of one period through the end of another. This reads the Paid log: each payment covers its dates evenly by day, so whatever of it falls in that window still counts. The request is what your plan needs through the end of that period, minus what's left of those payments.</p>
+      <div class="req-controls">
+        <div class="field" style="margin:0"><label class="hint" for="rqAsOf">As of</label><select id="rqAsOf"><option>Loading…</option></select></div>
+        <div class="field" style="margin:0"><label class="hint" for="rqThrough">Through the end of</label><select id="rqThrough"><option>Loading…</option></select></div>
+        <label class="toggle"><input type="checkbox" id="rqExpected" ${reqState.include_expected ? "checked" : ""}> Count expected payments too</label>
+      </div>
+      <div class="req-include">
+        <span class="hint">Include in the request:</span>
+        ${[["tuition", "Tuition"], ...b.categories.map(c => [`cat:${c.id}`, c.name + (c.extra ? " (adds to total)" : "")]),
+           ["items", "Individual expenses"], ["free", "Unallocated money"]].map(([k, label]) => `
+          <label class="toggle pill"><input type="checkbox" data-include="${esc(k)}" ${reqState.exclude.includes(k) ? "" : "checked"}> ${esc(label)}</label>`).join("")}
+      </div>
+      <div id="rqOut" class="req-out"><p class="hint">Working it out…</p></div>
+      <div class="req-add" id="rqAdd" hidden>
+        <div class="field" style="margin:0"><label class="hint" for="rqPayer">Ask</label>
+          <select id="rqPayer"><option value="">Not set</option>${people}</select></div>
+        <button type="button" class="primary" id="rqAddBtn">Add to Paid log as expected</button>
+        <span class="hint" id="rqAddNote"></span>
+      </div>
+    </div>`;
+}
+
+function wireRequest(b) {
+  let seq = 0, quote = null;
+  const out = $("#rqOut");
+  const fillPeriods = async () => {
+    const {answer: ends, error} = await ask({type: "periods", as_of: reqState.as_of});
+    if (!$("#rqThrough")) return;
+    if (error) {
+      $("#rqThrough").innerHTML = `<option value="">Unavailable</option>`;
+      out.innerHTML = `<p class="neg-text">Couldn't load the periods: ${esc(error)}${needsRestart ? " The planner needs a restart (see the banner at the top)." : ""}</p>`;
+      $("#rqAdd").hidden = true; return;
+    }
+    if (!ends.length) {
+      $("#rqThrough").innerHTML = `<option value="">No periods left in the term</option>`;
+      reqState.through = null; return update();
+    }
+    if (!ends.some(p => p.date === reqState.through && p.label === reqState.throughLabel)) {
+      const def = ends.find(p => p.kind === "quarter") || ends[0];
+      reqState.through = def.date; reqState.throughLabel = def.label;
+    }
+    $("#rqThrough").innerHTML = ends.map(p =>
+      `<option value="${p.date}" data-label="${esc(p.label)}" ${p.date === reqState.through && p.label === reqState.throughLabel ? "selected" : ""}>${esc(p.label)}</option>`).join("");
+    update();
+  };
+  const update = async () => {
+    const mine = ++seq;
+    if (!reqState.through) { out.innerHTML = `<p class="muted">The term is over, so there's nothing left to request.</p>`; $("#rqAdd").hidden = true; return; }
+    const {answer: q, error} = await ask({type: "request", as_of: reqState.as_of, through: reqState.through,
+                                          include_expected: reqState.include_expected, exclude: reqState.exclude});
+    if (mine !== seq || !out.isConnected) return;
+    if (error) { out.innerHTML = `<p class="neg-text">${esc(error)}</p>`; $("#rqAdd").hidden = true; return; }
+    quote = q;
+    const pays = q.payments.map(p => `
+      <tr><td class="indent">${p.payer ? esc(p.payer) + ", " : ""}${money(p.amount)} for ${esc(fmtRange(p.from, p.to))}${p.received ? "" : ` <span class="badge lock">expected</span>`}
+        <span class="hint">· ${p.days} of its ${p.days === 1 ? "day" : `${p.of_days} days`} left</span></td><td class="money num">−${money(p.left)}</td></tr>`).join("");
+    const gaps = q.gaps.map(g => `<li>${esc(g.label)}: plan needs <b class="num">${money(g.need)}</b></li>`).join("");
+    const short = q.request - q.gaps.reduce((t, g) => t + g.need, 0);  // payments that don't fully cover their own dates
+    out.innerHTML = `
+      <div class="node-stats">
+        <div class="chip ${q.request ? "tuition" : "strong"}"><div class="k">${q.request ? "To request" : "Covered"}</div>
+          <div class="v num">${money(q.request || q.extra)}${q.request ? "" : " <span class=\"hint\">extra</span>"}</div></div>
+        <div class="chip"><div class="k">Paid through</div><div class="v">${q.paid_through ? esc(q.paid_through_label) : `<span class="hint">Nothing covers ${esc(fmtDay(q.as_of))}</span>`}</div></div>
+      </div>
+      <table class="req-table">
+        <tr class="sub"><td colspan="2">Plan needs, ${esc(q.need.label)}</td></tr>
+        ${q.need.parts.filter(p => p.amount || !p.included).map(p => `
+        <tr class="${p.included ? "" : "left-out"}"><td class="indent">${esc(p.label)}${p.included ? "" : ` <span class="hint">· not included</span>`}</td>
+          <td class="money num">${money(p.amount)}</td></tr>`).join("")}
+        <tr><td><b>Included</b>${q.need.excluded ? ` <span class="hint">· ${money(q.need.excluded)} left out</span>` : ""}</td><td class="money num"><b>${money(q.need.total)}</b></td></tr>
+        ${pays || `<tr><td class="indent muted">No ${q.payments.length ? "" : reqState.include_expected ? "" : "received "}payments cover these dates</td><td class="money num">−$0.00</td></tr>`}
+        <tr class="total"><td>${q.request ? "To request" : "Left over after the plan"}</td><td class="money num">${money(q.request || q.extra)}</td></tr>
+      </table>
+      ${gaps ? `<div><b>Not covered by any payment</b><ul class="gaps">${gaps}</ul></div>` : ""}
+      ${short > 0 && q.payments.length ? `<p class="hint" style="margin:0">The request also includes ${money(short)} because the payments above fall short of what the plan needs for the dates they cover.</p>` : ""}`;
+    const from = q.paid_through ? nextDay(q.paid_through) : q.as_of;
+    const add = $("#rqAdd");
+    add.hidden = !q.request;
+    $("#rqAddNote").textContent = q.request ? `Logs ${money(q.request)} as expected, for ${fmtRange(from > q.through ? q.as_of : from, q.through)}.` : "";
+  };
+  const fillStarts = async () => {
+    const {answer: starts, error} = await ask({type: "starts", today: today()});
+    if (!$("#rqAsOf")) return;
+    if (error) {
+      $("#rqAsOf").innerHTML = `<option value="">Unavailable</option>`;
+      out.innerHTML = `<p class="neg-text">Couldn't load the periods: ${esc(error)}${needsRestart ? " The planner needs a restart (see the banner at the top)." : ""}</p>`;
+      $("#rqAdd").hidden = true; return;
+    }
+    if (!starts.length) {
+      $("#rqAsOf").innerHTML = `<option value="">The term is over</option>`;
+      reqState.through = null; return update();
+    }
+    if (!starts.some(p => p.date === reqState.as_of && p.label === reqState.asLabel)) {
+      const def = starts.find(p => p.kind === "month" && p.current) || starts[0];
+      reqState.as_of = def.date; reqState.asLabel = def.label;
+    }
+    $("#rqAsOf").innerHTML = starts.map(p =>
+      `<option value="${p.date}" data-label="${esc(p.label)}" ${p.date === reqState.as_of && p.label === reqState.asLabel ? "selected" : ""}>${esc(p.label)}</option>`).join("");
+    fillPeriods();
+  };
+  $("#rqAsOf").onchange = e => { const o = e.target.selectedOptions[0]; reqState.as_of = o.value; reqState.asLabel = o.dataset.label; fillPeriods(); };
+  $("#rqThrough").onchange = e => { const o = e.target.selectedOptions[0]; reqState.through = o.value; reqState.throughLabel = o.dataset.label; update(); };
+  $("#rqExpected").onchange = e => { reqState.include_expected = e.target.checked; update(); };
+  document.querySelectorAll("[data-include]").forEach(el => el.onchange = () => {
+    const k = el.dataset.include;
+    reqState.exclude = el.checked ? reqState.exclude.filter(x => x !== k) : [...new Set([...reqState.exclude, k])];
+    saveExclude(); update();
+  });
+  $("#rqPayer").onchange = e => { reqState.payer = e.target.value; };
+  $("#rqAddBtn").onclick = async () => {
+    if (!quote || !quote.request) return;
+    let from = quote.paid_through ? nextDay(quote.paid_through) : quote.as_of;
+    if (from > quote.through) from = quote.as_of;
+    if (await call({type: "add_receipt", received: false, date: null, amount: plain(quote.request),
+                    from, to: quote.through, payer: reqState.payer || null}))
+      showToast(`Added ${money(quote.request)} to the Paid log as expected.`, "info");
+  };
+  fillStarts();
+}
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const fmtDay = iso => `${MONTH_SHORT[+iso.slice(5, 7) - 1]} ${+iso.slice(8)}, ${iso.slice(0, 4)}`;
+const fmtRange = (a, b) => `${fmtDay(a)} to ${fmtDay(b)}`;
+function nextDay(iso) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
+
+function renderTerm() {
+  const b = budget, dlg = $("#termDlg");
+  const form = (id, label, value, button, hint, extra = "") => `
+    <form class="term-row" id="${id}">
+      <div class="field" style="margin:0">
+        <label for="${id}In" class="hint">${label}</label>
+        <div class="money-input"><input type="text" inputmode="decimal" id="${id}In" data-key="${id}" value="${value}" ${extra}></div>
+      </div>
+      <button type="submit" class="primary">${button}</button>
+      <p class="hint">${hint}</p>
+    </form>`;
+  const tuition = b.tuition.length ? `
+      ${form("tEach", "Quarterly tuition", b.tuition_each !== null ? plain(b.tuition_each) : "", "Apply to all",
+        `Fills in all ${b.tuition.length} payments below. Most right now: ${money(b.max_tuition_each)} per quarter.`,
+        b.tuition_each === null ? `placeholder="varies"` : "")}
+      <table class="pay-list">
+        <thead><tr><th>Payment</th><th>Due</th><th class="money">Amount</th></tr></thead>
+        <tbody>${b.tuition.map(p => `
+          <tr><td>${esc(p.label)}</td><td class="muted">${p.due_label ? esc(p.due_label) : "No date set"}</td>
+            <td class="money"><div class="money-input"><input type="text" inputmode="decimal" value="${plain(p.amount)}"
+              data-key="dlg-tamt-${p.id}" data-tuition-amount="${p.id}" aria-label="${esc(p.label)} tuition"></div></td></tr>`).join("")}</tbody>
+        <tfoot><tr><td colspan="2"><b>All ${b.tuition.length} payments</b></td><td class="money num" style="text-align:right"><b>${money(b.tuition_total)}</b></td></tr></tfoot>
+      </table>` : `
+      <p class="muted" style="margin:0">This term has no Fall, Winter or Spring quarter, so there's no tuition.</p>`;
+  dlg.innerHTML = `
+    <div class="dlg-head"><h2>Edit term</h2>
+      <div class="views" role="group" aria-label="Extra views">
+        <button type="button" data-view="optimize" class="${termView === "optimize" ? "on" : ""}" aria-pressed="${termView === "optimize"}">Optimize</button>
+        <button type="button" data-view="paid" class="${termView === "paid" ? "on" : ""}" aria-pressed="${termView === "paid"}">Paid</button>
+        <button type="button" data-view="request" class="${termView === "request" ? "on" : ""}" aria-pressed="${termView === "request"}">Request</button>
+      </div>
+      <button type="button" id="termClose">Done</button></div>
+    <div class="dlg-body">
+      ${termView === "optimize" ? optimizerPanel(b) : termView === "paid" ? paidPanel(b) : termView === "request" ? requestPanel(b) : ""}
+      <div class="term-group">
+        <h3>Quarters</h3>
+        <form class="term-row" id="tRange">
+          <div style="flex:1; min-width:260px">${quarterPickers("t", b.first_quarter, b.last_quarter, b.start)}</div>
+          <button type="submit" class="primary">Apply</button>
+          <p class="hint">Fall, Winter and Spring each carry tuition, even if the plan starts partway into the quarter; Summer has none. New quarters get the same tuition as the others. Spending is then re-split evenly across unlocked months; locked months keep their amounts and every month keeps its category overrides.</p>
+        </form>
+      </div>
+      <div class="term-group">
+        <h3>Term total</h3>
+        ${form("tAll", "Term total", plain(b.total), "Apply",
+          `Raising it adds the difference to the unlocked months evenly, and lowering it takes it back from them. Tuition stays the same. Lowest right now: ${money(b.min_total)}.${b.extra_total ? ` Not counted here: ${money(b.extra_total)} from Adds to total categories (${esc(b.extra_names.join(", "))}), which comes on top.` : ""}`)}
+      </div>
+      <div class="term-group">
+        <h3>Tuition</h3>
+        <div class="hint" style="margin:-4px 0 10px">Comes out of the term total. Any change, to all quarters or just one, moves the difference to or from the unlocked months evenly. Each quarter's payment can also be edited on the main screen.</div>
+        ${tuition}
+      </div>
+      <div class="term-group">
+        <h3>Start over</h3>
+        <div class="term-row">
+          <button type="button" class="ghost-danger" id="resetOpen">Reset everything…</button>
+          <p class="hint">Deletes this plan and goes back to setup. You'll be asked to confirm.</p>
+        </div>
+      </div>
+    </div>`;
+  dlg.classList.toggle("wide", termView !== null);
+  if (!dlg.open) dlg.showModal();
+  dlg.querySelectorAll("[data-view]").forEach(el => el.onclick = () => {
+    termView = termView === el.dataset.view ? null : el.dataset.view; renderTerm(); dlg.scrollTop = 0;
+  });
+  if (termView === "optimize") wireOptimizer(b);
+  if (termView === "paid") wirePaid(b);
+  if (termView === "request") wireRequest(b);
+  const on = (id, fn) => { const f = $("#" + id); if (f) f.onsubmit = e => { e.preventDefault(); fn(); }; };
+  on("tAll", () => call({type: "set_total", amount: $("#tAllIn").value}));
+  on("tEach", () => call({type: "set_tuition", amount: $("#tEachIn").value}));
+  dlg.querySelectorAll("[data-tuition-amount]").forEach(el => el.onchange = () =>
+    call({type: "set_tuition", id: el.dataset.tuitionAmount, amount: el.value}));
+  const term = wireQuarterPickers("t");
+  on("tRange", () => call({type: "set_term_quarters", ...term()}));
+  $("#termClose").onclick = () => dlg.close();
+  $("#resetOpen").onclick = () => {
+    $("#resetConfirm").value = ""; $("#resetGo").disabled = true; $("#resetDlg").showModal(); $("#resetConfirm").focus();
+  };
+}
+
+function renderMonth() {
+  const b = budget, m = b.months[openMonth], dlg = $("#monthDlg");
+  const n = b.months.length;
+  const othersUnlocked = b.months.filter(x => x.index !== m.index && !x.locked).length;
+  const catRows = m.categories.map(c => {
+    const cat = b.categories.find(x => x.id === c.id), def = cat.default;
+    return `
+      <tr>
+        <td>${esc(c.name)}${cat.static ? ` <span class="badge lock">Static</span>` : ""}</td>
+        <td class="money muted num">${money(def)}</td>
+        <td class="money"><div class="money-input"><input type="text" inputmode="decimal" class="${c.overridden ? "overridden" : ""}"
+          value="${plain(c.base)}" data-key="ov-${m.index}-${c.id}" data-override="${c.id}" aria-label="${esc(c.name)} in ${esc(m.label)}" ${cat.static ? "disabled" : ""}></div>
+          ${c.boost ? `<div class="hint num boost-note">+ ${money(c.boost)} from Optimize = ${money(c.amount)}</div>` : ""}</td>
+        <td class="act">${c.overridden && !cat.static ? `<button type="button" class="link" data-clear="${c.id}">Use default</button>` : ""}</td>
+      </tr>`;
+  }).join("");
+
+  dlg.innerHTML = `
+    <div class="dlg-head">
+      <button type="button" id="mPrev" aria-label="Previous month" ${m.index === 0 ? "disabled" : ""}>‹</button>
+      <h2>${esc(m.label)}</h2>
+      <button type="button" id="mNext" aria-label="Next month" ${m.index === n - 1 ? "disabled" : ""}>›</button>
+      <button type="button" id="mClose">Done</button>
+    </div>
+    <div class="dlg-body">
+      <div class="summary">
+        <div class="stat"><div class="k">Allocation</div><div class="v num">${money(m.alloc)}</div></div>
+        <div class="stat ${m.over ? "over" : ""}"><div class="k">Categories + expenses</div><div class="v num">${money(m.used)}</div></div>
+        ${m.over ? `<div class="stat over"><div class="k">Over by</div><div class="v num">${money(-m.remainder)}</div></div>`
+          : (() => { const q = b.quarters.find(q => q.months.includes(m.index)); return `<div class="stat ${q.unallocated < 0 ? "over" : ""}"><div class="k">${esc(q.label)} ${q.unallocated < 0 ? "over by" : "unallocated"}</div><div class="v num">${money(Math.abs(q.unallocated))}</div></div>`; })()}
+      </div>
+      ${m.tuition_due.map(p => `<div class="tuition-line num"><span>${esc(p.label)} tuition due ${esc(p.due_label)}. Paid from the tuition set-aside, not this month's allocation.</span><span>${money(p.amount)}</span></div>`).join("")}
+      ${m.over ? `<div class="alert">Categories and expenses are ${money(-m.remainder)} more than this month's allocation. ${m.soft ? `Re-optimize (Edit term, then Optimize) can take back up to ${money(Math.min(m.soft, -m.remainder))} of Optimize's extra. ` : ""}Otherwise raise the allocation, or lower a category or expense.</div>` : ""}
+      <div>
+        <form class="alloc-row" id="allocForm">
+          <div class="field" style="margin:0">
+            <label for="allocIn" class="hint">${m.extra ? "Allocation from the term total" : "Set allocation"}</label>
+            <div class="money-input"><input type="text" inputmode="decimal" id="allocIn" value="${plain(m.alloc_base)}" data-key="alloc-${m.index}"></div>
+          </div>
+          <button type="submit" class="primary">Apply</button>
+          <label class="toggle"><input type="checkbox" id="lockIn" ${m.locked ? "checked" : ""}> Lock this month</label>
+        </form>
+        <p class="hint" style="margin:8px 0 0">${othersUnlocked
+          ? `The difference is spread evenly across the other ${othersUnlocked} unlocked month${othersUnlocked === 1 ? "" : "s"}. Most this month can be right now: ${money(m.max_alloc)}.${m.extra ? ` ${money(m.extra)} of extra money is added on top, for ${money(m.alloc)} in all.` : ""}`
+          : `All other months are locked, so this allocation can't change until you unlock one.`}
+          ${m.locked ? " Locked months are never changed when other months are adjusted." : ""}</p>
+      </div>
+      <div>
+        <h2>Categories this month</h2>
+        ${m.categories.length ? `
+        <table>
+          <thead><tr><th>Category</th><th class="money">Default</th><th class="money">This month</th><th></th></tr></thead>
+          <tbody>${catRows}</tbody>
+        </table>` : `<p class="muted">No categories yet. Add them on the main screen.</p>`}
+      </div>
+      ${m.items.length ? `
+      <div>
+        <h2>Individual expenses this month</h2>
+        <table>
+          <tbody>${m.items.map(it => `<tr><td>${esc(it.name)}</td><td class="money num" style="text-align:right">${money(it.amount)}</td></tr>`).join("")}</tbody>
+          <tfoot><tr><td><b>Total</b></td><td class="money num" style="text-align:right"><b>${money(m.items_total)}</b></td></tr></tfoot>
+        </table>
+        <p class="hint" style="margin:6px 0 0">Edit these under ${esc(quarterLabel(m.key))} on the main screen.</p>
+      </div>` : ""}
+    </div>`;
+
+  if (!dlg.open) dlg.showModal();
+  $("#mClose").onclick = () => { openMonth = null; dlg.close(); };
+  $("#mPrev").onclick = () => { openMonth--; renderMonth(); };
+  $("#mNext").onclick = () => { openMonth++; renderMonth(); };
+  $("#allocForm").onsubmit = e => { e.preventDefault(); call({type: "set_alloc", index: m.index, amount: $("#allocIn").value}); };
+  $("#lockIn").onchange = e => call({type: "set_lock", index: m.index, locked: e.target.checked});
+  dlg.querySelectorAll("[data-override]").forEach(el => el.onchange = () =>
+    call({type: "set_override", index: m.index, id: el.dataset.override, amount: el.value.trim()}));
+  dlg.querySelectorAll("[data-clear]").forEach(el => el.onclick = () =>
+    call({type: "set_override", index: m.index, id: el.dataset.clear, amount: null}));
+}
+
+$("#monthDlg").addEventListener("close", () => { openMonth = null; });
+$("#termDlg").addEventListener("close", () => { termOpen = false; termView = null; });
+
+// ---------------------------------------------------------------- reset
+
+$("#resetConfirm").oninput = e => { $("#resetGo").disabled = e.target.value.trim() !== "RESET"; };
+$("#resetCancel").onclick = () => $("#resetDlg").close();
+$("#resetGo").onclick = async () => {
+  $("#resetDlg").close();
+  if (await call({type: "reset"})) showToast(transport.resetNote, "info");
+};
+
+transport.reload = load;
+load();
+let shownDay = today();
+setInterval(() => { if (today() !== shownDay && budget) { shownDay = today(); render(); } }, 60 * 1000);
+</script>
+</body>
+</html>

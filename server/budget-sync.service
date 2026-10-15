@@ -1,0 +1,22 @@
+# Runs the website sync for the budget planner on this server.
+# Install:
+#   sudo cp server/budget-sync.service /etc/systemd/system/budget-sync.service
+#   (edit User and the two paths below first)
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now budget-sync
+# Logs: journalctl -u budget-sync -f
+[Unit]
+Description=Budget planner website sync
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=CHANGE_ME
+WorkingDirectory=/home/CHANGE_ME/budget-planner
+ExecStart=/usr/bin/python3 -m server.sync
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

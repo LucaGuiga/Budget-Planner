@@ -1,0 +1,31 @@
+BUDGET PLANNER: HOW TO INSTALL
+
+Plans how a term's money (tuition included) gets spent month by month.
+It runs only on your computer. Nothing is sent anywhere.
+It needs Python 3.9 or newer; on Windows the installer gets it for you.
+
+First, unzip the file you were sent. If you were also sent a budget file
+(budget.json), save it into your Downloads folder before installing. Then:
+
+WINDOWS
+  Double-click "Install on Windows". If Python isn't on your PC yet, it
+  installs it for you first (this takes a minute or two).
+  If Windows warns you, click More info, then Run anyway (or just Run).
+
+MAC
+  Double-click "Install on Mac".
+  If macOS says it can't be opened: right-click it, choose Open, then Open again.
+
+LINUX
+  Open a terminal in this folder and run:  sh "Install on Linux.sh"
+
+Leave the "app" folder where it is; the installer needs it.
+
+When it's done, double-click Budget Planner on your Desktop. A small window
+opens next to your browser; that window is the planner running. Close it to
+stop the planner. Your budget is saved as you go.
+
+Installing again later updates the app and keeps your budget.
+Sent a newer budget file? Close the planner, save the file into Downloads,
+and run the installer again. Your old budget is backed up first.
+You can delete this unzipped folder after installing.

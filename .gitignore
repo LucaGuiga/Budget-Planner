@@ -1,0 +1,13 @@
+# Your budgets and everything the planner saves. Never commit these.
+data/
+# The planner server's settings hold the API token.
+server/config.ini
+
+# Built files: remake with make_package.py and make_site.py
+dist/
+site/
+_site/
+
+__pycache__/
+*.tmp
+.DS_Store
