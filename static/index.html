@@ -140,6 +140,13 @@ button.ghost-danger { background: none; color: var(--danger); border-color: var(
 .q-items table { margin-top: 8px; }
 .month-col { width: 150px; }
 .chip .sub { font-size: 11px; color: var(--muted); }
+
+/* hover explanations: any element with data-tip (or title) */
+#tip { position: fixed; inset: auto; margin: 0; z-index: 1000; max-width: min(300px, calc(100vw - 16px));
+  background: var(--text); color: var(--bg); border: none; border-radius: 8px; padding: 8px 10px;
+  font-size: 13px; line-height: 1.4; box-shadow: 0 4px 16px rgba(0,0,0,.25); pointer-events: none; white-space: normal; }
+#tip:not(:popover-open):not(.show) { display: none; }
+.chip[data-tip], .alloc[data-tip] { cursor: help; }
 .cats .row.extra span:first-child::after { content: " +"; color: var(--accent); font-weight: 700; }
 .cats .row.boosted span:last-child::after { content: " ↑"; color: var(--accent); }
 .rem + .fixable, .fixable { color: var(--accent); font-size: 12px; margin-top: -4px; }
@@ -486,9 +493,53 @@ function showToast(msg, kind = "error") {
 function hideToast() { $("#toast").className = ""; }
 $("#toastX").onclick = hideToast;
 
+// ---------------------------------------------------------------- hover explanations
+
+// One bubble for the whole page. Anything with data-tip shows it on hover or
+// keyboard focus; plain title attributes are switched over the first time,
+// so every explanation looks and behaves the same. It's a popover so it shows
+// above an open dialog too.
+const tip = Object.assign(document.createElement("div"), {id: "tip", role: "tooltip"});
+const tipPopover = typeof tip.showPopover === "function";
+if (tipPopover) tip.setAttribute("popover", "manual");
+document.body.append(tip);
+let tipFor = null, tipTimer;
+function showTip(el) {
+  tipFor = el; tip.textContent = el.dataset.tip;
+  tip.style.left = tip.style.top = "0px";  // measure at full width, then place it
+  if (tipPopover) { if (!tip.matches(":popover-open")) tip.showPopover(); } else tip.classList.add("show");
+  const r = el.getBoundingClientRect(), t = tip.getBoundingClientRect(), gap = 8;
+  const below = r.bottom + gap + t.height <= innerHeight - gap;
+  tip.style.top = `${below ? r.bottom + gap : Math.max(gap, r.top - gap - t.height)}px`;
+  tip.style.left = `${Math.min(Math.max(gap, r.left + r.width / 2 - t.width / 2), innerWidth - gap - t.width)}px`;
+}
+function hideTip() {
+  clearTimeout(tipTimer); tipFor = null;
+  if (tipPopover) { if (tip.matches(":popover-open")) tip.hidePopover(); } else tip.classList.remove("show");
+}
+function tipTarget(node) {
+  const el = node instanceof Element ? node.closest("[data-tip], [title]") : null;
+  if (el?.hasAttribute("title")) { el.dataset.tip = el.title; el.removeAttribute("title"); }
+  return el?.dataset.tip ? el : null;
+}
+const tipOn = e => {
+  if (e.type === "focusin" && !e.target.matches(":focus-visible")) return;  // keyboard only, not clicks
+  const el = tipTarget(e.target);
+  if (el === tipFor) return;
+  hideTip();
+  if (el) { tipFor = el; tipTimer = setTimeout(() => el.isConnected && showTip(el), e.type === "focusin" ? 0 : 150); }
+};
+document.addEventListener("mouseover", tipOn);
+document.addEventListener("focusin", tipOn);
+document.addEventListener("focusout", hideTip);
+document.addEventListener("scroll", hideTip, true);
+document.addEventListener("pointerdown", hideTip);
+document.addEventListener("keydown", e => { if (e.key === "Escape" && tipFor) hideTip(); });
+
 // ---------------------------------------------------------------- render
 
 function render() {
+  hideTip();  // its element is about to be replaced
   // Keep focus on the same field across re-renders (e.g. tabbing through amounts).
   const key = document.activeElement?.dataset?.key;
   if (!budget) renderSetup(); else renderDashboard();
@@ -567,7 +618,7 @@ function monthCard(m) {
     <button class="card ${m.over ? "over" : ""} ${m.key === today().slice(0, 7) ? "current" : ""}" data-month="${m.index}" type="button">
       <div class="top"><span class="name">${esc(m.label)}</span>
         <span>${m.key === today().slice(0, 7) ? `<span class="badge now">This month</span> ` : ""}${m.locked ? `<span class="badge lock">Locked</span>` : ""}${m.over ? ` <span class="badge bad">Over</span>` : ""}</span></div>
-      <div class="alloc num">${money(m.alloc)}</div>
+      <div class="alloc num" data-tip="${esc(m.label)}'s allocation: what this month gets to spend${m.extra ? `, including ${money(m.extra)} that comes in on top` : ""}. Click the tile to change it.">${money(m.alloc)}</div>
       ${m.extra ? `<div class="hint num" style="margin-top:-6px" title="Paid by money on top of the term total">incl. ${money(m.extra)} extra</div>` : ""}
       <div class="bar" title="Categories and expenses use ${Math.round(pct)}% of this month"><div style="width:${pct}%"></div></div>
       <div class="cats">${cats}${items}</div>
@@ -696,10 +747,10 @@ function quarterNode(b, q) {
               <span class="num" data-qleft="${esc(q.label)}"><span class="hint">…</span></span>
             </div>
           <div class="node-stats q-stats">
-            <div class="chip"><div class="k">Spending</div><div class="v num">${money(q.spending)}</div></div>
-            <div class="chip ${q.unallocated < 0 ? "neg" : ""}" title="Assigned to this quarter's months minus everything planned in them. New expenses in the quarter come out of this.">
+            <div class="chip" data-tip="What ${esc(q.label)}'s ${q.months.length} month${q.months.length === 1 ? "" : "s"} get to spend, added up. Tuition isn't included."><div class="k">Spending</div><div class="v num">${money(q.spending)}</div></div>
+            <div class="chip ${q.unallocated < 0 ? "neg" : ""}" data-tip="${q.unallocated < 0 ? `More is planned in ${esc(q.label)} than its months have. Lower a category or expense, or raise a month.` : `Given to ${esc(q.label)}'s months but not to any category or expense yet. New expenses in the quarter come out of this.`}">
               <div class="k">${q.unallocated < 0 ? "Over by" : "Unallocated"}</div><div class="v num">${money(Math.abs(q.unallocated))}</div></div>
-            <div class="chip strong"><div class="k">Quarter total</div><div class="v num">${money(q.total)}</div></div>
+            <div class="chip strong" data-tip="${esc(q.label)}'s spending${q.tuition_amount ? " plus its tuition" : ""}: everything this quarter costs."><div class="k">Quarter total</div><div class="v num">${money(q.total)}</div></div>
           </div>
           </div>
           ${tuition}
@@ -735,14 +786,14 @@ function renderDashboard() {
           <div class="hint">${b.quarters.length} quarters · ${b.months.length} months, ${esc(m0.label)} to ${esc(mN.label)}</div>
         </div>
         <div class="node-stats">
-          <div class="chip strong" title="${b.extra_total ? `Term total ${money(b.total)} + ${money(b.extra_total)} on top (${esc(b.extra_names.join(", "))})` : "The term total"}">
+          <div class="chip strong" data-tip="Everything you have for the term: the term total you set (${money(b.total)})${b.extra_total ? ` plus ${money(b.extra_total)} that comes in on top from Adds to total categories (${esc(b.extra_names.join(", "))})` : ""}. Change the term total in Edit term.">
             <div class="k">Total available</div><div class="v num">${money(b.available)}</div>
             ${b.extra_total ? `<div class="sub num">incl. ${money(b.extra_total)} ${esc(b.extra_names.join(", "))}</div>` : ""}</div>
-          <div class="chip ${b.left < 0 ? "neg" : "strong"}" title="Total available minus tuition minus every category in every month">
+          <div class="chip ${b.left < 0 ? "neg" : "strong"}" data-tip="Money not given to anything yet: Total available minus tuition, minus every category and individual expense in every month.${b.left < 0 ? " It's below $0.00, so more is planned than you have." : ""}">
             <div class="k">Total left</div><div class="v num">${money(b.left)}</div></div>
-          <div class="chip tuition"><div class="k">Tuition, ${b.tuition.length} quarter${b.tuition.length === 1 ? "" : "s"}</div><div class="v num">${money(b.tuition_total)}</div></div>
-          <div class="chip"><div class="k">Spending</div><div class="v num">${money(b.month_sum + b.extra_total)}</div></div>
-          <div class="chip" title="Tuition plus every month should equal the term total"><div class="k">Check</div><div class="v">${b.matches
+          <div class="chip tuition" data-tip="All tuition payments this term, one for each Fall, Winter and Spring quarter (Summer has none). It comes out of the term total before any spending."><div class="k">Tuition, ${b.tuition.length} quarter${b.tuition.length === 1 ? "" : "s"}</div><div class="v num">${money(b.tuition_total)}</div></div>
+          <div class="chip" data-tip="What all the months get to spend, added up: the term total minus tuition${b.extra_total ? `, plus the ${money(b.extra_total)} that comes in on top` : ""}."><div class="k">Spending</div><div class="v num">${money(b.month_sum + b.extra_total)}</div></div>
+          <div class="chip" data-tip="Tuition plus every month's allocation should equal the term total. Adds up means nothing is missing or counted twice."><div class="k">Check</div><div class="v">${b.matches
             ? `<span class="badge ok">Adds up</span>`
             : `<span class="badge bad">Off by ${money(Math.abs(b.month_sum + b.tuition_total - b.total))}</span>`}</div></div>
           <button type="button" class="primary" id="termOpen">Edit term</button>
