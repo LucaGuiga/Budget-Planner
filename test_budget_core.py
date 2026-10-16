@@ -672,6 +672,11 @@ class AddsToTotal(unittest.TestCase):
         left = core.quarter_left(self.s, "Fall 2026", "2026-12-01")
         self.assertEqual(left["spending"], 145_000)
 
+    def test_coverage_leaves_out_extra(self):
+        c = core.coverage(self.s, 625_000, "2026-12-01", "2026-12-31")  # Dec without its $200 gas, plus tuition
+        self.assertEqual((c["spending"], c["extra"], c["tuition"], c["total"], c["diff"]),
+                         (125_000, 20_000, 500_000, 625_000, 0))
+
     def test_v6_files_upgrade(self):
         old = dict(self.plain, version=6,
                    categories=[{k: v for k, v in c.items() if k != "extra"} for c in self.plain["categories"]])

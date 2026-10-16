@@ -1052,8 +1052,13 @@ def delete_receipt(state, rid):
 
 
 def coverage(state, amount, start, end):
+    """Is a payment enough for its dates? Adds to total categories (like gas money)
+    come in on top of the term total, so a payment isn't expected to cover them:
+    they're left out of spending and total, and reported in "extra"."""
     need = need_for_range(state, start, end)
-    return dict(need, amount=amount, diff=amount - need["total"])
+    spending = need["spending"] - need["extra"]
+    total = spending + need["tuition"]
+    return dict(need, spending=spending, total=total, amount=amount, diff=amount - total)
 
 
 def period_ends(state, as_of):

@@ -127,23 +127,31 @@ the budget API, used by `test_web_sync.py`.
   diamond, and count toward Total left. The lists start closed, showing just
   the quarter's expense total; click to open one. Changing the term can't drop a month that
   still has expenses; move or delete them first.
-- **Paid** (in Edit term): a log of money received. Each payment has whether
-  it's received and when, the amount, the dates it's for, who paid (from a names
-  list you manage there) and whether they were reimbursed. It's checked against
-  what the plan needs for those dates (each month's budget scaled to the days
-  covered, plus tuition due in the range) and shows "Enough, $X extra" or
-  "Short $X", live while you type. It's a record only and never changes the plan.
-- **Request** (in Edit term): how much to ask for. Pick whole periods only: "as
-  of" the start of a month or quarter (this month by default) through the end
-  of a month, a quarter or the term. Each payment in
-  the Paid log covers its dates evenly by day, so whatever of it falls in the
-  window still counts. Shows the plan's need, what's left of each payment, what
-  to request, the date you're paid through and any uncovered dates. "Add to
-  Paid log as expected" logs the request for the uncovered dates. Expected
-  payments only count if you tick the box. Untick any part to leave it out of
-  the request: Tuition, each category, Individual expenses or Unallocated money.
-  The breakdown shows every part and what was left out; your choices are
-  remembered in your browser.
+- **Tickets** (in Edit term): everything about money coming in, in three
+  labeled sections and nothing else on screen.
+  1. **Request money**: how much to ask for. Pick whole periods only: "as
+     of" the start of a month or quarter (this month by default) through the end
+     of a month, a quarter or the term. Each payment in the Log covers its dates
+     evenly by day, so whatever of it falls in the window still counts. Shows the
+     plan's need, what's left of each payment, what to request, the date you're
+     paid through and any uncovered dates. "Add to Log as expected" logs the
+     request for the uncovered dates. Expected payments only count if you tick
+     the box. Untick any part to leave it out of the request: Tuition, each
+     category, Individual expenses or Unallocated money. Adds to total
+     categories (like gas money) start unticked, since that money comes in on
+     top; tick one to ask for it anyway. The breakdown shows every part and what
+     was left out; your choices are remembered in your browser.
+  2. **Add a payment**: log money by hand with whether it's received and when,
+     the amount, the dates it's for and who paid (from a names list you manage
+     there). It's checked against what the plan needs for those dates (each
+     month's budget scaled to the days covered, plus tuition due in the range)
+     and shows "Enough, $X extra" or "Short $X", live while you type. Adds to
+     total categories aren't counted, since that money comes in on top.
+  3. **Log**: every payment, with totals received, expected and not reimbursed.
+     Edit any field in place, mark it reimbursed, or delete it. Ticking
+     Received stamps today's date and locks it; untick to clear it (for a
+     mistaken click), and tick again to stamp a new one. It's a record
+     only and never changes the plan.
 - **Left as of a date**: each quarter header has a date (today by default) and
   shows how much of that quarter's budget is still ahead from that day, plus its
   tuition if it isn't due yet.

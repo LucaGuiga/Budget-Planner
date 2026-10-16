@@ -208,6 +208,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .paid-table input[type=text] { padding: 4px 8px 4px 20px; }
 .paid-table select { min-width: 100px; padding: 4px 6px; }
 .paid-table .reimb { display: flex; gap: 6px; align-items: center; }
+.locked-date { border: 1px solid var(--border); border-radius: 8px; padding: 3px 8px; color: var(--muted); }
 .q-left { margin-top: 8px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
 .q-left input[type=date] { width: auto; padding: 3px 6px; font-size: 13px; margin-left: 4px; }
 
@@ -242,6 +243,8 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .term-group { display: grid; gap: 8px; }
 .term-group + .term-group { border-top: 1px solid var(--border); padding-top: 16px; }
 .term-group h3 { margin: 0; font-size: 15px; }
+.term-group h3 .step { display: inline-grid; place-items: center; width: 22px; height: 22px; margin-right: 8px;
+  border-radius: 99px; background: var(--accent); color: var(--accent-text); font-size: 12px; vertical-align: 1px; }
 .term-row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
 .term-row .money-input { width: 180px; }
 .term-row p { flex-basis: 100%; margin: 0; }
@@ -266,6 +269,7 @@ button:disabled { opacity: .5; cursor: not-allowed; }
 .cats .row span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tuition-line { display: flex; justify-content: space-between; gap: 8px; font-size: 13px;
   background: var(--tuition-soft); border-radius: 6px; padding: 4px 8px; }
+.tuition-line.due { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }  /* month tile: one line, amount is on the quarter */
 .rem { display: flex; justify-content: space-between; font-size: 14px;
   border-top: 1px solid var(--border); padding-top: 8px; }
 .rem.over { color: var(--danger); font-weight: 600; }
@@ -301,6 +305,9 @@ dialog {
   color: var(--text); width: min(680px, calc(100vw - 32px)); max-height: calc(100vh - 40px);
 }
 dialog::backdrop { background: rgba(0,0,0,.45); }
+/* While a dialog is open the page behind it stays put, even if the dialog itself has nothing to scroll. */
+html:has(dialog[open]) { overflow: hidden; }
+dialog { overscroll-behavior: contain; }
 .dlg-head { display: flex; align-items: center; gap: 8px; padding: 14px 18px;
   border-bottom: 1px solid var(--border); position: sticky; top: 0; background: var(--surface); z-index: 1; }
 .dlg-head h2 { margin: 0; flex: 1; }
@@ -360,11 +367,21 @@ label.toggle { display: inline-flex; align-items: center; gap: 8px; cursor: poin
 let budget = null;      // server summary, or null before setup
 let openMonth = null;   // index of the month in the editor
 let termOpen = false;   // is the Edit term dialog showing
-let termView = null;    // wide view inside Edit term: null, "optimize", "paid" or "request"
+let termView = null;    // wide view inside Edit term: null, "optimize" or "tickets"
+const stored = (name, fallback) => { try { return JSON.parse(localStorage.getItem(name) || fallback); } catch (e) { return JSON.parse(fallback); } };
+// Adds to total categories are money coming in on top (like gas money), so Request
+// leaves them out unless you tick them back in (includeExtra).
 let reqState = {as_of: null, through: null, include_expected: false, payer: "",
-  exclude: (() => { try { return JSON.parse(localStorage.getItem("requestExclude") || "[]"); } catch (e) { return []; } })()};
+  exclude: stored("requestExclude", "[]"), includeExtra: stored("requestIncludeExtra", "[]")};
+const isExtraKey = (b, k) => b.categories.some(c => c.extra && `cat:${c.id}` === k);
+const reqIncluded = (b, k) => isExtraKey(b, k) ? reqState.includeExtra.includes(k) : !reqState.exclude.includes(k);
+const reqExclude = b => [...reqState.exclude.filter(k => !isExtraKey(b, k)),
+  ...b.categories.filter(c => c.extra && !reqState.includeExtra.includes(`cat:${c.id}`)).map(c => `cat:${c.id}`)];
 function saveExclude() {
-  try { localStorage.setItem("requestExclude", JSON.stringify(reqState.exclude)); } catch (e) { /* not saved, still works */ }
+  try {
+    localStorage.setItem("requestExclude", JSON.stringify(reqState.exclude));
+    localStorage.setItem("requestIncludeExtra", JSON.stringify(reqState.includeExtra));
+  } catch (e) { /* not saved, still works */ }
 }
 const quarterDates = {}; // quarter label -> "as of" date chosen in its header
 let paidDraft = {received: true, date: today(), amount: "", from: "", to: "", payer: ""};
@@ -552,9 +569,9 @@ function monthCard(m) {
         <span>${m.key === today().slice(0, 7) ? `<span class="badge now">This month</span> ` : ""}${m.locked ? `<span class="badge lock">Locked</span>` : ""}${m.over ? ` <span class="badge bad">Over</span>` : ""}</span></div>
       <div class="alloc num">${money(m.alloc)}</div>
       ${m.extra ? `<div class="hint num" style="margin-top:-6px" title="Paid by money on top of the term total">incl. ${money(m.extra)} extra</div>` : ""}
-      ${m.tuition_due.map(p => `<div class="tuition-line num"><span>Pay ${esc(p.label.split(" ")[0])} tuition by ${esc(p.due_label.replace(/, \d{4}$/, ""))}</span><span>${money(p.amount)}</span></div>`).join("")}
       <div class="bar" title="Categories and expenses use ${Math.round(pct)}% of this month"><div style="width:${pct}%"></div></div>
       <div class="cats">${cats}${items}</div>
+      ${m.tuition_due.map(p => `<div class="tuition-line due">Pay ${esc(p.label.split(" ")[0])} tuition by ${esc(p.due_label.replace(/, \d{4}$/, ""))}</div>`).join("")}
       ${m.over ? `<div class="rem num over">
         <span>Over by</span><span>${money(-m.remainder)}</span></div>` : ""}
       ${m.over && m.soft ? `<div class="hint fixable">Re-optimize can take back up to ${money(Math.min(m.soft, -m.remainder))}</div>` : ""}
@@ -898,8 +915,9 @@ function wireOptimizer(b) {
   };
 }
 
-// Money received: a log of payments in, what dates each one is for, whether
-// it covers the plan for those dates, who paid, and whether they were reimbursed.
+// Money received: add a payment by hand, then the log of payments in, what dates
+// each one is for, whether it covers the plan for those dates, who paid, and
+// whether they were reimbursed. Returns the two sections separately.
 function paidPanel(b) {
   const pd = b.paid, d = paidDraft;
   const people = sel => `<option value="">Not set</option>` + pd.people.map(p =>
@@ -909,12 +927,12 @@ function paidPanel(b) {
     : `<span class="badge bad">Short ${money(-c.diff)}</span>`;
   const rows = pd.receipts.map(r => `
     <tr>
-      <td><input type="checkbox" data-r="${r.id}" data-field="received" ${r.received ? "checked" : ""} aria-label="Received"></td>
-      <td><input type="date" value="${esc(r.date || "")}" data-key="rdate-${r.id}" data-r="${r.id}" data-field="date" ${r.received ? "" : "disabled"} aria-label="Date received"></td>
+      <td class="reimb"><label class="toggle"><input type="checkbox" data-r="${r.id}" data-field="received" ${r.received ? "checked" : ""} aria-label="Received"> ${r.received ? "" : "No"}</label>
+        ${r.received && r.date ? `<span class="locked-date num" title="Set when you ticked Received. Untick to clear it.">${esc(fmtDay(r.date))}</span>` : ""}</td>
       <td class="money"><div class="money-input"><input type="text" inputmode="decimal" value="${plain(r.amount)}" data-key="ramt-${r.id}" data-r="${r.id}" data-field="amount" aria-label="Amount"></div></td>
       <td class="range"><input type="date" value="${esc(r.from)}" data-key="rfrom-${r.id}" data-r="${r.id}" data-field="from" aria-label="For, from">
         <span class="hint">to</span> <input type="date" value="${esc(r.to)}" data-key="rto-${r.id}" data-r="${r.id}" data-field="to" aria-label="For, to"></td>
-      <td title="Plan needs ${money(r.check.total)} for these dates (${money(r.check.spending)} spending + ${money(r.check.tuition)} tuition)">${check(r.check)}</td>
+      <td title="Plan needs ${money(r.check.total)} for these dates (${money(r.check.spending)} spending + ${money(r.check.tuition)} tuition)${r.check.extra ? `, not counting ${money(r.check.extra)} of ${esc(b.extra_names.join(", "))}` : ""}">${check(r.check)}</td>
       <td><select data-key="rpayer-${r.id}" data-r="${r.id}" data-field="payer" aria-label="Who paid">${people(r.payer)}</select></td>
       <td class="reimb"><label class="toggle"><input type="checkbox" data-r="${r.id}" data-field="reimbursed" ${r.reimbursed ? "checked" : ""}> ${r.reimbursed ? "" : "No"}</label>
         ${r.reimbursed ? `<input type="date" value="${esc(r.reimbursed_date || "")}" data-key="rrdate-${r.id}" data-r="${r.id}" data-field="reimbursed_date" aria-label="Date reimbursed">` : ""}</td>
@@ -924,19 +942,12 @@ function paidPanel(b) {
       <li><input type="text" value="${esc(p.name)}" data-key="pname-${p.id}" data-person="${p.id}" aria-label="Name">
         <span class="hint">${p.uses} payment${p.uses === 1 ? "" : "s"}</span>
         ${p.uses ? "" : `<button type="button" class="link" data-pdel="${p.id}" style="color:var(--danger)">Delete</button>`}</li>`).join("");
-  return `
+  const add = `
     <div class="term-group paid">
-      <h3>Money received</h3>
+      <h3><span class="step">2</span>Add a payment</h3>
       <p class="hint" style="margin:-4px 0 4px">Log money that comes in and the dates it's for. Each one is checked against what your plan needs for those dates: every month's budget scaled to the days covered, plus any tuition due in that range. This is a record only and doesn't change the plan.</p>
-      <div class="node-stats">
-        <div class="chip strong"><div class="k">Received</div><div class="v num">${money(pd.received)}</div></div>
-        <div class="chip"><div class="k">Expected, not received yet</div><div class="v num">${money(pd.expected)}</div></div>
-        <div class="chip tuition"><div class="k">Not reimbursed yet</div><div class="v num">${money(pd.not_reimbursed)}</div></div>
-        <div class="chip"><div class="k">Total available</div><div class="v num">${money(b.available)}</div></div>
-      </div>
       <div class="opt-cols paid-cols">
         <form class="opt-col" id="newReceipt">
-          <h4>Add a payment</h4>
           <div class="paid-grid">
             <div class="field" style="margin:0"><label class="hint" for="nrAmount">Amount</label><div class="money-input"><input type="text" inputmode="decimal" id="nrAmount" placeholder="0.00" value="${esc(d.amount)}" data-key="nr-amount"></div></div>
             <div class="field" style="margin:0"><label class="hint" for="nrDate">Date received</label><input type="date" id="nrDate" value="${esc(d.date)}" ${d.received ? "" : "disabled"}></div>
@@ -957,14 +968,25 @@ function paidPanel(b) {
           </div>
         </div>
       </div>
+    </div>`;
+  const log = `
+    <div class="term-group log">
+      <h3><span class="step">3</span>Log</h3>
+      <div class="node-stats">
+        <div class="chip strong"><div class="k">Received</div><div class="v num">${money(pd.received)}</div></div>
+        <div class="chip"><div class="k">Expected, not received yet</div><div class="v num">${money(pd.expected)}</div></div>
+        <div class="chip tuition"><div class="k">Not reimbursed yet</div><div class="v num">${money(pd.not_reimbursed)}</div></div>
+        <div class="chip"><div class="k">Total available</div><div class="v num">${money(b.available)}</div></div>
+      </div>
       ${pd.receipts.length ? `
       <div class="opt-table-wrap">
         <table class="paid-table">
-          <thead><tr><th>Received</th><th>Date</th><th class="money">Amount</th><th>For</th><th>Covers it?</th><th>Who paid</th><th>Reimbursed</th><th></th></tr></thead>
+          <thead><tr><th>Received</th><th class="money">Amount</th><th>For</th><th>Covers it?</th><th>Who paid</th><th>Reimbursed</th><th></th></tr></thead>
           <tbody>${rows}</tbody>
         </table>
       </div>` : `<p class="muted" style="margin:0">No payments logged yet.</p>`}
     </div>`;
+  return {add, log};
 }
 
 function wirePaid(b) {
@@ -986,7 +1008,8 @@ function wirePaid(b) {
     const verdict = !d.amount ? "" : c.diff >= 0
       ? ` <span class="badge ok">${c.diff === 0 ? "Exactly enough" : `Enough, ${money(c.diff)} extra`}</span>`
       : ` <span class="badge bad">Short ${money(-c.diff)}</span>`;
-    out.innerHTML = `Your plan needs <b class="num">${money(c.total)}</b> for ${esc(c.label)}: ${money(c.spending)} spending${c.extra ? ` (incl. ${money(c.extra)} of ${esc(b.extra_names.join(", "))})` : ""} + ${money(c.tuition)} tuition due in that range.${verdict}`
+    out.innerHTML = `Your plan needs <b class="num">${money(c.total)}</b> for ${esc(c.label)}: ${money(c.spending)} spending + ${money(c.tuition)} tuition due in that range.${verdict}`
+      + (c.extra ? `<br>Not counting ${money(c.extra)} of ${esc(b.extra_names.join(", "))}, which comes in on top of the term total.` : "")
       + (c.outside ? `<br>Part of this range is outside the plan, so those days count as $0.00.` : "");
   };
   form.querySelectorAll("input, select").forEach(el => { el.oninput = preview; el.onchange = preview; });
@@ -1004,6 +1027,7 @@ function wirePaid(b) {
     const v = el.type === "checkbox" ? el.checked : el.value;
     const change = {[f]: v === "" ? null : v};
     if (f === "reimbursed" && v) change.reimbursed_date = today();
+    if (f === "received") change.date = v ? today() : null;  // the date is locked; untick and tick again to reset it
     call({type: "update_receipt", id: el.dataset.r, ...change});
   });
   dlg.querySelectorAll("[data-rdel]").forEach(el => el.onclick = () => {
@@ -1025,13 +1049,19 @@ function wirePaid(b) {
 
 // Request: how much to ask for through the end of a whole month or quarter,
 // after what's left of the money already received.
+// Tickets: Request first, then Add a payment, then the Log at the bottom.
+function ticketsPanel(b) {
+  const paid = paidPanel(b);
+  return requestPanel(b) + paid.add + paid.log;
+}
+
 function requestPanel(b) {
   const people = b.paid.people.map(p =>
     `<option value="${p.id}" ${p.id === reqState.payer ? "selected" : ""}>${esc(p.name)}</option>`).join("");
   return `
     <div class="term-group request">
-      <h3>Request money</h3>
-      <p class="hint" style="margin:-4px 0 4px">Pick whole months or quarters to cover, from the start of one period through the end of another. This reads the Paid log: each payment covers its dates evenly by day, so whatever of it falls in that window still counts. The request is what your plan needs through the end of that period, minus what's left of those payments.</p>
+      <h3><span class="step">1</span>Request money</h3>
+      <p class="hint" style="margin:-4px 0 4px">Pick whole months or quarters to cover, from the start of one period through the end of another. This reads the Log below: each payment covers its dates evenly by day, so whatever of it falls in that window still counts. The request is what your plan needs through the end of that period, minus what's left of those payments.</p>
       <div class="req-controls">
         <div class="field" style="margin:0"><label class="hint" for="rqAsOf">As of</label><select id="rqAsOf"><option>Loading…</option></select></div>
         <div class="field" style="margin:0"><label class="hint" for="rqThrough">Through the end of</label><select id="rqThrough"><option>Loading…</option></select></div>
@@ -1041,13 +1071,13 @@ function requestPanel(b) {
         <span class="hint">Include in the request:</span>
         ${[["tuition", "Tuition"], ...b.categories.map(c => [`cat:${c.id}`, c.name + (c.extra ? " (adds to total)" : "")]),
            ["items", "Individual expenses"], ["free", "Unallocated money"]].map(([k, label]) => `
-          <label class="toggle pill"><input type="checkbox" data-include="${esc(k)}" ${reqState.exclude.includes(k) ? "" : "checked"}> ${esc(label)}</label>`).join("")}
+          <label class="toggle pill"><input type="checkbox" data-include="${esc(k)}" ${reqIncluded(b, k) ? "checked" : ""}> ${esc(label)}</label>`).join("")}
       </div>
       <div id="rqOut" class="req-out"><p class="hint">Working it out…</p></div>
       <div class="req-add" id="rqAdd" hidden>
         <div class="field" style="margin:0"><label class="hint" for="rqPayer">Ask</label>
           <select id="rqPayer"><option value="">Not set</option>${people}</select></div>
-        <button type="button" class="primary" id="rqAddBtn">Add to Paid log as expected</button>
+        <button type="button" class="primary" id="rqAddBtn">Add to Log as expected</button>
         <span class="hint" id="rqAddNote"></span>
       </div>
     </div>`;
@@ -1080,7 +1110,7 @@ function wireRequest(b) {
     const mine = ++seq;
     if (!reqState.through) { out.innerHTML = `<p class="muted">The term is over, so there's nothing left to request.</p>`; $("#rqAdd").hidden = true; return; }
     const {answer: q, error} = await ask({type: "request", as_of: reqState.as_of, through: reqState.through,
-                                          include_expected: reqState.include_expected, exclude: reqState.exclude});
+                                          include_expected: reqState.include_expected, exclude: reqExclude(b)});
     if (mine !== seq || !out.isConnected) return;
     if (error) { out.innerHTML = `<p class="neg-text">${esc(error)}</p>`; $("#rqAdd").hidden = true; return; }
     quote = q;
@@ -1136,7 +1166,8 @@ function wireRequest(b) {
   $("#rqExpected").onchange = e => { reqState.include_expected = e.target.checked; update(); };
   document.querySelectorAll("[data-include]").forEach(el => el.onchange = () => {
     const k = el.dataset.include;
-    reqState.exclude = el.checked ? reqState.exclude.filter(x => x !== k) : [...new Set([...reqState.exclude, k])];
+    const list = isExtraKey(b, k) ? "includeExtra" : "exclude", add = isExtraKey(b, k) === el.checked;
+    reqState[list] = add ? [...new Set([...reqState[list], k])] : reqState[list].filter(x => x !== k);
     saveExclude(); update();
   });
   $("#rqPayer").onchange = e => { reqState.payer = e.target.value; };
@@ -1146,7 +1177,7 @@ function wireRequest(b) {
     if (from > quote.through) from = quote.as_of;
     if (await call({type: "add_receipt", received: false, date: null, amount: plain(quote.request),
                     from, to: quote.through, payer: reqState.payer || null}))
-      showToast(`Added ${money(quote.request)} to the Paid log as expected.`, "info");
+      showToast(`Added ${money(quote.request)} to the Log as expected.`, "info");
   };
   fillStarts();
 }
@@ -1160,6 +1191,11 @@ function nextDay(iso) {
 
 function renderTerm() {
   const b = budget, dlg = $("#termDlg");
+  // Redrawing after a change (like ticking Received in the Log) shouldn't jump to the top.
+  // The Request section reloads on its own, so keep its last results up meanwhile to hold the height.
+  const scroll = dlg.open ? dlg.scrollTop : 0;
+  const keep = ["#rqAsOf", "#rqThrough", "#rqOut", "#rqAddNote"].map(sel => [sel, dlg.querySelector(sel)?.innerHTML]);
+  const addHidden = dlg.querySelector("#rqAdd")?.hidden;
   const form = (id, label, value, button, hint, extra = "") => `
     <form class="term-row" id="${id}">
       <div class="field" style="margin:0">
@@ -1186,12 +1222,12 @@ function renderTerm() {
     <div class="dlg-head"><h2>Edit term</h2>
       <div class="views" role="group" aria-label="Extra views">
         <button type="button" data-view="optimize" class="${termView === "optimize" ? "on" : ""}" aria-pressed="${termView === "optimize"}">Optimize</button>
-        <button type="button" data-view="paid" class="${termView === "paid" ? "on" : ""}" aria-pressed="${termView === "paid"}">Paid</button>
-        <button type="button" data-view="request" class="${termView === "request" ? "on" : ""}" aria-pressed="${termView === "request"}">Request</button>
+        <button type="button" data-view="tickets" class="${termView === "tickets" ? "on" : ""}" aria-pressed="${termView === "tickets"}">Tickets</button>
       </div>
       <button type="button" id="termClose">Done</button></div>
     <div class="dlg-body">
-      ${termView === "optimize" ? optimizerPanel(b) : termView === "paid" ? paidPanel(b) : termView === "request" ? requestPanel(b) : ""}
+      ${termView === "tickets" ? ticketsPanel(b) : `
+      ${termView === "optimize" ? optimizerPanel(b) : ""}
       <div class="term-group">
         <h3>Quarters</h3>
         <form class="term-row" id="tRange">
@@ -1216,16 +1252,19 @@ function renderTerm() {
           <button type="button" class="ghost-danger" id="resetOpen">Reset everything…</button>
           <p class="hint">Deletes this plan and goes back to setup. You'll be asked to confirm.</p>
         </div>
-      </div>
+      </div>`}
     </div>`;
+  keep.forEach(([sel, html]) => { const el = dlg.querySelector(sel); if (el && html !== undefined) el.innerHTML = html; });
+  if (addHidden !== undefined && $("#rqAdd")) $("#rqAdd").hidden = addHidden;
   dlg.classList.toggle("wide", termView !== null);
   if (!dlg.open) dlg.showModal();
+  dlg.scrollTop = scroll;
   dlg.querySelectorAll("[data-view]").forEach(el => el.onclick = () => {
     termView = termView === el.dataset.view ? null : el.dataset.view; renderTerm(); dlg.scrollTop = 0;
   });
   if (termView === "optimize") wireOptimizer(b);
-  if (termView === "paid") wirePaid(b);
-  if (termView === "request") wireRequest(b);
+  $("#termClose").onclick = () => dlg.close();
+  if (termView === "tickets") { wireRequest(b); wirePaid(b); return; }  // nothing else is on screen
   const on = (id, fn) => { const f = $("#" + id); if (f) f.onsubmit = e => { e.preventDefault(); fn(); }; };
   on("tAll", () => call({type: "set_total", amount: $("#tAllIn").value}));
   on("tEach", () => call({type: "set_tuition", amount: $("#tEachIn").value}));
@@ -1233,7 +1272,6 @@ function renderTerm() {
     call({type: "set_tuition", id: el.dataset.tuitionAmount, amount: el.value}));
   const term = wireQuarterPickers("t");
   on("tRange", () => call({type: "set_term_quarters", ...term()}));
-  $("#termClose").onclick = () => dlg.close();
   $("#resetOpen").onclick = () => {
     $("#resetConfirm").value = ""; $("#resetGo").disabled = true; $("#resetDlg").showModal(); $("#resetConfirm").focus();
   };
