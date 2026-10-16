@@ -935,7 +935,7 @@ function paidPanel(b) {
       <td title="Plan needs ${money(r.check.total)} for these dates (${money(r.check.spending)} spending + ${money(r.check.tuition)} tuition)${r.check.extra ? `, not counting ${money(r.check.extra)} of ${esc(b.extra_names.join(", "))}` : ""}">${check(r.check)}</td>
       <td><select data-key="rpayer-${r.id}" data-r="${r.id}" data-field="payer" aria-label="Who paid">${people(r.payer)}</select></td>
       <td class="reimb"><label class="toggle"><input type="checkbox" data-r="${r.id}" data-field="reimbursed" ${r.reimbursed ? "checked" : ""}> ${r.reimbursed ? "" : "No"}</label>
-        ${r.reimbursed ? `<input type="date" value="${esc(r.reimbursed_date || "")}" data-key="rrdate-${r.id}" data-r="${r.id}" data-field="reimbursed_date" aria-label="Date reimbursed">` : ""}</td>
+        ${r.reimbursed && r.reimbursed_date ? `<span class="locked-date num" title="Set when you ticked Reimbursed. Untick to clear it.">${esc(fmtDay(r.reimbursed_date))}</span>` : ""}</td>
       <td class="act"><button type="button" class="link" data-rdel="${r.id}" style="color:var(--danger)" aria-label="Delete this payment" title="Delete">✕</button></td>
     </tr>`).join("");
   const peopleRows = pd.people.map(p => `
@@ -1026,7 +1026,7 @@ function wirePaid(b) {
     const f = el.dataset.field;
     const v = el.type === "checkbox" ? el.checked : el.value;
     const change = {[f]: v === "" ? null : v};
-    if (f === "reimbursed" && v) change.reimbursed_date = today();
+    if (f === "reimbursed") change.reimbursed_date = v ? today() : null;  // locked like Received
     if (f === "received") change.date = v ? today() : null;  // the date is locked; untick and tick again to reset it
     call({type: "update_receipt", id: el.dataset.r, ...change});
   });

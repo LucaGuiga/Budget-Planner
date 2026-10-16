@@ -148,9 +148,9 @@ the budget API, used by `test_web_sync.py`.
      and shows "Enough, $X extra" or "Short $X", live while you type. Adds to
      total categories aren't counted, since that money comes in on top.
   3. **Log**: every payment, with totals received, expected and not reimbursed.
-     Edit any field in place, mark it reimbursed, or delete it. Ticking
-     Received stamps today's date and locks it; untick to clear it (for a
-     mistaken click), and tick again to stamp a new one. It's a record
+     Edit any field in place, or delete it. Ticking Received or Reimbursed
+     stamps today's date and locks it; untick to clear it (for a mistaken
+     click), and tick again to stamp a new one. It's a record
      only and never changes the plan.
 - **Left as of a date**: each quarter header has a date (today by default) and
   shows how much of that quarter's budget is still ahead from that day, plus its
