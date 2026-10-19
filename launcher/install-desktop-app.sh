@@ -5,6 +5,13 @@ set -e
 HERE="${0:A:h}"
 PROJECT="${HERE:h}"
 APP="$HOME/Desktop/Budget Planner.app"
+# Store the folder relative to the home folder when possible, so the app still
+# works on another Mac (for example through iCloud Desktop sync) with a different user name.
+if [[ "$PROJECT" == "$HOME"/* ]]; then
+  PROJECT_PATH="\$HOME/${PROJECT#$HOME/}"
+else
+  PROJECT_PATH="$PROJECT"
+fi
 
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
@@ -29,7 +36,7 @@ cat > "$APP/Contents/MacOS/BudgetPlanner" <<LAUNCH
 #!/bin/zsh
 # If the planner is already running, just reopen its page. Otherwise start it
 # in a Terminal window (close that window to stop it).
-PROJECT="$PROJECT"
+PROJECT="$PROJECT_PATH"
 INFO="\$PROJECT/data/server.json"
 if [[ -f "\$INFO" ]]; then
   pid=\$(/usr/bin/plutil -extract pid raw -o - "\$INFO" 2>/dev/null)
